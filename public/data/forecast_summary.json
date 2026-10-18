@@ -1,0 +1,173 @@
+{
+  "generatedAt": "2026-10-17T08:00:00Z",
+  "clinicScope": "Barangay D.S. Garcia, Cabanatuan City",
+  "vialForecasts": [
+    {
+      "vaccineType": "anti-rabies",
+      "displayName": "Anti-Rabies Vaccine (PVRV)",
+      "brandSummary": "Verorab / Speeda (PVRV)",
+      "currentStock": 126,
+      "safetyThreshold": 30,
+      "scheduledReturning30d": 68,
+      "projectedNewWalkIn30d": 112,
+      "projected30DayDemand": 180,
+      "projected90DayDemand": 531,
+      "dailyBurnRate": 6.0,
+      "estimatedDaysUntilStockout": 21,
+      "recommendedRestockQty": 84,
+      "stockStatus": "REORDER SOON"
+    },
+    {
+      "vaccineType": "anti-tetanus",
+      "displayName": "Anti-Tetanus Toxoid (TT)",
+      "brandSummary": "Tetavax (Tetanus Toxoid 0.5mL)",
+      "currentStock": 36,
+      "safetyThreshold": 15,
+      "scheduledReturning30d": 8,
+      "projectedNewWalkIn30d": 46,
+      "projected30DayDemand": 54,
+      "projected90DayDemand": 159,
+      "dailyBurnRate": 1.8,
+      "estimatedDaysUntilStockout": 20,
+      "recommendedRestockQty": 33,
+      "stockStatus": "REORDER SOON"
+    },
+    {
+      "vaccineType": "ERIG",
+      "displayName": "Equine Rabies Immunoglobulin (ERIG)",
+      "brandSummary": "Equirab (ERIG 200 IU/mL)",
+      "currentStock": 7,
+      "safetyThreshold": 10,
+      "scheduledReturning30d": 0,
+      "projectedNewWalkIn30d": 27,
+      "projected30DayDemand": 27,
+      "projected90DayDemand": 80,
+      "dailyBurnRate": 0.9,
+      "estimatedDaysUntilStockout": 7,
+      "recommendedRestockQty": 30,
+      "stockStatus": "CRITICAL RESTOCK"
+    }
+  ],
+  "categoryBreakdown": [
+    {
+      "category": "Category I",
+      "clinicalDefinition": "Touching/feeding animals, licks on intact skin (Wash only)",
+      "incidentCount": 29,
+      "sharePercent": 15.8,
+      "protocol": "Wound Cleansing + Observation"
+    },
+    {
+      "category": "Category II",
+      "clinicalDefinition": "Nibbling of uncovered skin, minor scratches/abrasions without bleeding",
+      "incidentCount": 108,
+      "sharePercent": 58.7,
+      "protocol": "PVRV Regimen (Days 0, 3, 7, 14, 28) + Anti-Tetanus"
+    },
+    {
+      "category": "Category III",
+      "clinicalDefinition": "Single/multiple transdermal bites or scratches, mucosal contamination",
+      "incidentCount": 47,
+      "sharePercent": 25.5,
+      "protocol": "ERIG Infiltration + Full 5-Dose PVRV + Anti-Tetanus"
+    }
+  ],
+  "purokBreakdown": [
+    {
+      "purok": "Purok 1 (Centro), Brgy. D.S. Garcia",
+      "categoryI": 6,
+      "categoryII": 24,
+      "categoryIII": 14,
+      "totalCases": 44,
+      "primaryVector": "Stray Dog (64%)",
+      "riskLevel": "HIGH SURGE"
+    },
+    {
+      "purok": "Purok 6 (Riverbank), Brgy. D.S. Garcia",
+      "categoryI": 4,
+      "categoryII": 19,
+      "categoryIII": 12,
+      "totalCases": 35,
+      "primaryVector": "Stray Dog (71%)",
+      "riskLevel": "HIGH SURGE"
+    },
+    {
+      "purok": "Purok 3 (Rizal St.), Brgy. D.S. Garcia",
+      "categoryI": 5,
+      "categoryII": 18,
+      "categoryIII": 7,
+      "totalCases": 30,
+      "primaryVector": "Domestic Dog (53%)",
+      "riskLevel": "MODERATE"
+    },
+    {
+      "purok": "Purok 2 (Mabini Ext.), Brgy. D.S. Garcia",
+      "categoryI": 4,
+      "categoryII": 15,
+      "categoryIII": 5,
+      "totalCases": 24,
+      "primaryVector": "Domestic Cat (48%)",
+      "riskLevel": "MODERATE"
+    },
+    {
+      "purok": "Purok 4 (Del Pilar), Brgy. D.S. Garcia",
+      "categoryI": 3,
+      "categoryII": 12,
+      "categoryIII": 4,
+      "totalCases": 19,
+      "primaryVector": "Stray Cat (52%)",
+      "riskLevel": "BASELINE"
+    },
+    {
+      "purok": "Purok 5 (Maharlika), Brgy. D.S. Garcia",
+      "categoryI": 5,
+      "categoryII": 11,
+      "categoryIII": 3,
+      "totalCases": 19,
+      "primaryVector": "Domestic Dog (68%)",
+      "riskLevel": "BASELINE"
+    },
+    {
+      "purok": "Purok 7 (Narra St.), Brgy. D.S. Garcia",
+      "categoryI": 2,
+      "categoryII": 9,
+      "categoryIII": 2,
+      "totalCases": 13,
+      "primaryVector": "Domestic Dog (61%)",
+      "riskLevel": "BASELINE"
+    }
+  ],
+  "weeklyTrends": [
+    {
+      "week": "2026-W38 (Sep 19 - Sep 25)",
+      "walkIns": 38,
+      "catIIICases": 8,
+      "vialsDispensed": 114
+    },
+    {
+      "week": "2026-W39 (Sep 26 - Oct 02)",
+      "walkIns": 42,
+      "catIIICases": 10,
+      "vialsDispensed": 129
+    },
+    {
+      "week": "2026-W40 (Oct 03 - Oct 09)",
+      "walkIns": 49,
+      "catIIICases": 13,
+      "vialsDispensed": 148
+    },
+    {
+      "week": "2026-W41 (Oct 10 - Oct 16)",
+      "walkIns": 55,
+      "catIIICases": 16,
+      "vialsDispensed": 172
+    }
+  ],
+  "completionVsDefaulterRates": {
+    "totalScheduledDosesEvaluated": 740,
+    "fulfilledCount": 642,
+    "defaulterCount": 46,
+    "pendingCount": 52,
+    "completionRatePercent": 93.3,
+    "defaulterRatePercent": 6.7
+  }
+}

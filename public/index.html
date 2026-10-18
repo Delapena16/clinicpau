@@ -1,0 +1,1014 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dr. Pau Medical Center Inc. | Barangay D.S. Garcia ABTC &amp; PEP Registry</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700&display=swap"
+    rel="stylesheet"
+  />
+  <link rel="stylesheet" href="/css/styles.css" />
+</head>
+<body>
+  <div id="toastMessage" class="toast-notification hidden" role="status" aria-live="polite"></div>
+
+  <main id="authScreen" class="auth-screen">
+    <div class="auth-card">
+      <div class="auth-brand-header">
+        <img src="/drpau-logo.jpg" alt="Dr. Pau Medical Center Inc. Logo" class="clinic-logo" />
+        <div class="auth-brand-text">
+          <div class="auth-org-code">ABC Emergency • Animal Bite Treatment Center</div>
+          <h1 class="auth-title">DR. PAU MEDICAL CENTER INC.</h1>
+          <p class="auth-subtitle">Primary Care Clinic &amp; Animal Bite Center — Barangay D.S. Garcia</p>
+          <p class="auth-motto">"TRUSTED CARE, EXCELLENT SERVICE."</p>
+        </div>
+      </div>
+
+      <div id="authAlertBanner" class="auth-alert hidden"></div>
+
+      <form id="loginStep1Form" class="clinical-form">
+        <div class="step-label">Clinic Staff Sign In</div>
+
+        <div class="form-group">
+          <label for="loginEmail">Clinic Email Address</label>
+          <input
+            type="email"
+            id="loginEmail"
+            required
+            autocomplete="username"
+            placeholder="staff@drpauclinic.ph"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="loginPassword">Password</label>
+          <input
+            type="password"
+            id="loginPassword"
+            required
+            autocomplete="current-password"
+            placeholder="Enter clinic password"
+          />
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block" id="loginStep1Btn">
+          Sign In
+        </button>
+
+        <div class="quick-accounts-hint">
+          <span class="hint-title">Demo Staff Accounts:</span>
+          <div class="hint-buttons">
+            <button type="button" class="role-select-btn" data-fill-role="Receptionist">Receptionist</button>
+            <button type="button" class="role-select-btn" data-fill-role="Physician">Physician</button>
+            <button type="button" class="role-select-btn" data-fill-role="SuperAdmin">SuperAdmin</button>
+          </div>
+        </div>
+      </form>
+
+      <form id="loginStep2Form" class="clinical-form hidden">
+        <div class="step-label">Security Verification</div>
+
+        <p class="instruction-text">
+          Enter the 6-digit verification code from the clinic terminal for
+          <strong id="mfaTargetEmailDisplay"></strong>.
+        </p>
+
+        <div class="form-group">
+          <label for="loginOtpCode">6-Digit Verification Code</label>
+          <input
+            type="text"
+            id="loginOtpCode"
+            class="mono-num otp-input"
+            maxlength="6"
+            pattern="\d{6}"
+            required
+            autocomplete="one-time-code"
+            placeholder="000000"
+          />
+        </div>
+
+        <div class="form-actions-row">
+          <button type="submit" class="btn btn-primary" id="loginStep2Btn">
+            Verify &amp; Open Workspace
+          </button>
+          <button type="button" class="btn btn-secondary" id="backToStep1Btn">
+            Back to Sign In
+          </button>
+        </div>
+      </form>
+    </div>
+  </main>
+
+  <div id="authenticatedAppShell" class="ehr-layout hidden">
+    <aside class="ehr-sidebar">
+      <div class="sidebar-brand">
+        <img src="/drpau-logo.jpg" alt="Dr. Pau Logo" class="sidebar-logo" />
+        <div class="sidebar-brand-info">
+          <span class="sidebar-org-title">DR. PAU MEDICAL CENTER</span>
+          <span class="sidebar-org-sub">Brgy. D.S. Garcia ABTC</span>
+        </div>
+      </div>
+
+      <div class="sidebar-section-label" id="sidebarRoleHeaderLabel">Navigation</div>
+      <nav class="sidebar-nav" id="roleSidebarNav" aria-label="Role Scoped Navigation"></nav>
+
+      <div class="sidebar-footer">
+        <div class="sidebar-motto">"TRUSTED CARE, EXCELLENT SERVICE."</div>
+        <div class="sidebar-meta">Barangay D.S. Garcia, Cabanatuan City</div>
+      </div>
+    </aside>
+
+    <div class="ehr-main">
+      <header class="ehr-topbar">
+        <div class="topbar-identity">
+          <div class="topbar-title-row">
+            <h1 class="topbar-title">DR. PAU MEDICAL CENTER INC.</h1>
+            <span class="topbar-motto-tag">"TRUSTED CARE, EXCELLENT SERVICE."</span>
+          </div>
+          <p class="topbar-subtitle" id="workspaceSubtitle">
+            Primary Care Clinic &amp; Animal Bite Center — Barangay D.S. Garcia PEP Registry
+          </p>
+        </div>
+
+        <div class="topbar-actions">
+          <div class="staff-badge-block">
+            <span class="staff-name" id="headerUserFullName"></span>
+            <span class="badge badge-role" id="headerUserRoleBadge"></span>
+          </div>
+          <button type="button" class="btn btn-outline-sm" id="logoutBtn">Sign Out</button>
+        </div>
+      </header>
+
+      <div class="ehr-content">
+        <section id="viewRecQueue" class="ehr-view hidden">
+          <div class="view-header-bar">
+            <div>
+              <h2 class="view-heading">Front Desk Queue — Barangay D.S. Garcia</h2>
+            </div>
+            <div class="view-header-actions">
+              <button
+                type="button"
+                class="btn btn-primary"
+                id="quickJumpRegisterWalkInBtn"
+                data-jump-nav="viewRecIntake"
+                data-focus-input="regFullName"
+              >
+                + Register Walk-In Patient
+              </button>
+            </div>
+          </div>
+
+          <div class="kpi-grid" id="recKpiGrid">
+            <div class="kpi-card kpi-clickable" data-rec-kpi-filter="Waiting for Doctor">
+              <span class="kpi-label">Needs Triage</span>
+              <strong class="kpi-value tabular-num" id="recKpiWaitingDoctor">0</strong>
+              <span class="kpi-meta">Waiting for physician</span>
+            </div>
+            <div class="kpi-card kpi-clickable" data-rec-kpi-filter="Due Today">
+              <span class="kpi-label">Follow-Ups Due Today</span>
+              <strong class="kpi-value tabular-num" id="recKpiDueToday">0</strong>
+              <span class="kpi-meta">Day 3, 7, 14, or 28</span>
+            </div>
+            <div class="kpi-card kpi-clickable active-kpi" data-rec-kpi-filter="All">
+              <span class="kpi-label">Active Brgy. D.S. Garcia Records</span>
+              <strong class="kpi-value tabular-num" id="recKpiTotalPatients">0</strong>
+              <span class="kpi-meta">All enrolled patients</span>
+            </div>
+            <div class="kpi-card kpi-card-alert kpi-clickable" data-rec-kpi-filter="Missed Dose">
+              <span class="kpi-label">Missed / Overdue</span>
+              <strong class="kpi-value text-red tabular-num" id="recKpiMissedCount">0</strong>
+              <span class="kpi-meta">Requires follow-up call</span>
+            </div>
+          </div>
+
+          <div class="panel-card">
+            <div class="panel-header">
+              <h3 class="panel-title">Patient Queue</h3>
+              <input
+                type="text"
+                id="recQueueSearchInput"
+                class="search-input"
+                placeholder="Search by ID, Patient Name, or Purok..."
+              />
+            </div>
+
+            <div class="toolbar-row">
+              <div class="filter-tabs" id="recQueueFilterTabs">
+                <button type="button" class="filter-tab active" data-rec-queue-filter="All">All</button>
+                <button type="button" class="filter-tab" data-rec-queue-filter="Waiting for Doctor">Waiting</button>
+                <button type="button" class="filter-tab" data-rec-queue-filter="Due Today">Due Today</button>
+                <button type="button" class="filter-tab" data-rec-queue-filter="Category III">Category III</button>
+                <button type="button" class="filter-tab" data-rec-queue-filter="Missed Dose">Missed / Overdue</button>
+              </div>
+            </div>
+
+            <div class="table-container">
+              <table class="clinical-table">
+                <thead>
+                  <tr>
+                    <th class="col-id">Registry ID</th>
+                    <th>Patient &amp; Purok (Brgy. D.S. Garcia)</th>
+                    <th>Exposure</th>
+                    <th class="num-col">Bite Date</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="recFrontDeskTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section id="viewRecIntake" class="ehr-view hidden">
+          <div class="view-header-bar">
+            <div>
+              <h2 class="view-heading">New Walk-In Intake</h2>
+            </div>
+          </div>
+
+          <div class="panel-card">
+            <div class="panel-header">
+              <h3 class="panel-title">Patient Registration — Barangay D.S. Garcia</h3>
+            </div>
+
+            <form id="walkInRegistrationForm" class="clinical-form">
+              <div class="form-section-title">Patient Information</div>
+              <div class="grid-4">
+                <div class="form-group">
+                  <label for="regFullName">Full Name *</label>
+                  <input type="text" id="regFullName" required placeholder="e.g., Lorna Macaspac" />
+                </div>
+                <div class="form-group">
+                  <label for="regAge">Age (Years) *</label>
+                  <input type="number" id="regAge" class="tabular-num" min="0" max="120" required placeholder="31" />
+                </div>
+                <div class="form-group">
+                  <label for="regSex">Sex *</label>
+                  <select id="regSex" required>
+                    <option value="Female">Female</option>
+                    <option value="Male">Male</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="regContact">Mobile Number (11-Digit PH) *</label>
+                  <input
+                    type="text"
+                    id="regContact"
+                    class="mono-num"
+                    maxlength="13"
+                    required
+                    placeholder="09176428910"
+                  />
+                </div>
+              </div>
+
+              <div class="form-section-title">Address &amp; Exposure Details</div>
+              <div class="grid-4">
+                <div class="form-group">
+                  <label for="regBarangay">Purok in Barangay D.S. Garcia *</label>
+                  <select id="regBarangay" required>
+                    <option value="Purok 1 (Centro), Brgy. D.S. Garcia">Purok 1 (Centro), Brgy. D.S. Garcia</option>
+                    <option value="Purok 2 (Mabini Ext.), Brgy. D.S. Garcia">Purok 2 (Mabini Ext.), Brgy. D.S. Garcia</option>
+                    <option value="Purok 3 (Rizal St.), Brgy. D.S. Garcia">Purok 3 (Rizal St.), Brgy. D.S. Garcia</option>
+                    <option value="Purok 4 (Del Pilar), Brgy. D.S. Garcia">Purok 4 (Del Pilar), Brgy. D.S. Garcia</option>
+                    <option value="Purok 5 (Maharlika), Brgy. D.S. Garcia">Purok 5 (Maharlika), Brgy. D.S. Garcia</option>
+                    <option value="Purok 6 (Riverbank), Brgy. D.S. Garcia">Purok 6 (Riverbank), Brgy. D.S. Garcia</option>
+                    <option value="Purok 7 (Narra St.), Brgy. D.S. Garcia">Purok 7 (Narra St.), Brgy. D.S. Garcia</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="regAnimalType">Animal Type *</label>
+                  <select id="regAnimalType" required>
+                    <option value="Dog">Domestic Dog</option>
+                    <option value="Stray Dog">Stray Dog</option>
+                    <option value="Cat">Domestic Cat</option>
+                    <option value="Stray Cat">Stray Cat</option>
+                    <option value="Other">Other Animal</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="regBiteSite">Body Part Affected *</label>
+                  <input type="text" id="regBiteSite" required placeholder="e.g., Right Calf" />
+                </div>
+                <div class="form-group">
+                  <label for="regDay0Date">Date of Bite / Walk-In *</label>
+                  <input type="date" id="regDay0Date" class="mono-num" required />
+                </div>
+              </div>
+
+              <div class="consent-banner">
+                <input type="checkbox" id="regConsentCheckbox" required checked />
+                <label for="regConsentCheckbox">
+                  <strong>Data Privacy Consent (RA 10173):</strong> Patient consents to recording contact and exposure details in the Barangay D.S. Garcia PEP Registry.
+                </label>
+              </div>
+
+              <div class="form-actions-end">
+                <button type="button" class="btn btn-secondary" id="resetWalkInFormBtn">
+                  Reset
+                </button>
+                <button type="submit" class="btn btn-primary" id="submitWalkInIntakeBtn">
+                  Add to Doctor's Queue
+                </button>
+              </div>
+            </form>
+          </div>
+        </section>
+
+        <section id="viewRecFollowUp" class="ehr-view hidden">
+          <div class="view-header-bar">
+            <div>
+              <h2 class="view-heading">Follow-Up Schedule (Days 3, 7, 14 &amp; 28)</h2>
+            </div>
+          </div>
+
+          <div class="panel-card">
+            <div class="toolbar-row">
+              <div class="filter-tabs" id="recFollowUpFilterTabs">
+                <button type="button" class="filter-tab active" data-rec-filter="All">All</button>
+                <button type="button" class="filter-tab" data-rec-filter="Waiting for Doctor">Waiting</button>
+                <button type="button" class="filter-tab" data-rec-filter="Due Today">Due Today</button>
+                <button type="button" class="filter-tab" data-rec-filter="Category III">Category III</button>
+                <button type="button" class="filter-tab" data-rec-filter="Missed Dose">Missed / Overdue</button>
+              </div>
+              <input
+                type="text"
+                id="recFollowUpSearchInput"
+                class="search-input"
+                placeholder="Search returning patient by Name, ID, or Purok..."
+              />
+            </div>
+
+            <div class="table-container">
+              <table class="clinical-table">
+                <thead>
+                  <tr>
+                    <th class="col-id">Registry ID</th>
+                    <th>Patient &amp; Contact #</th>
+                    <th>Purok Location</th>
+                    <th>5-Dose PEP Schedule</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="recFollowUpTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section id="viewPhysTriage" class="ehr-view hidden">
+          <div class="view-header-bar">
+            <div>
+              <h2 class="view-heading">Doctor's Triage &amp; Dosing</h2>
+            </div>
+          </div>
+
+          <div class="kpi-grid" id="physKpiGrid">
+            <div class="kpi-card kpi-clickable" data-phys-kpi-filter="Waiting for Doctor">
+              <span class="kpi-label">Waiting for Triage</span>
+              <strong class="kpi-value tabular-num" id="physKpiWaiting">0</strong>
+              <span class="kpi-meta">Needs WHO classification</span>
+            </div>
+            <div class="kpi-card kpi-clickable" data-phys-kpi-filter="Due Today">
+              <span class="kpi-label">Follow-Ups Due Today</span>
+              <strong class="kpi-value tabular-num" id="physKpiDueToday">0</strong>
+              <span class="kpi-meta">Scheduled Day 3, 7, 14, or 28</span>
+            </div>
+            <div class="kpi-card kpi-card-alert kpi-clickable" data-phys-kpi-filter="Category III">
+              <span class="kpi-label">Category III Severe Cases</span>
+              <strong class="kpi-value text-red tabular-num" id="physKpiCat3">0</strong>
+              <span class="kpi-meta">ERIG + Anti-Rabies</span>
+            </div>
+            <div class="kpi-card kpi-clickable" data-jump-nav="viewPhysInventory">
+              <span class="kpi-label">Available Anti-Rabies Vials</span>
+              <strong class="kpi-value tabular-num" id="physKpiRabiesVials">0</strong>
+              <span class="kpi-meta">Cold-chain PVRV stock</span>
+            </div>
+          </div>
+
+          <div class="split-grid-58-42">
+            <div class="panel-card">
+              <div class="panel-header">
+                <h3 class="panel-title">Checked-In &amp; Due Patients</h3>
+                <input
+                  type="text"
+                  id="physQueueSearchInput"
+                  class="search-input"
+                  placeholder="Search by Name, ID, or Purok..."
+                />
+              </div>
+
+              <div class="toolbar-row">
+                <div class="filter-tabs" id="physTriageFilterTabs">
+                  <button type="button" class="filter-tab active" data-phys-queue-filter="All">All</button>
+                  <button type="button" class="filter-tab" data-phys-queue-filter="Waiting for Doctor">Waiting</button>
+                  <button type="button" class="filter-tab" data-phys-queue-filter="Due Today">Due Today</button>
+                  <button type="button" class="filter-tab" data-phys-queue-filter="Category III">Category III</button>
+                  <button type="button" class="filter-tab" data-phys-queue-filter="Missed Dose">Missed / Overdue</button>
+                </div>
+              </div>
+
+              <div class="table-container">
+                <table class="clinical-table">
+                  <thead>
+                    <tr>
+                      <th class="col-id">Registry ID</th>
+                      <th>Patient &amp; Purok</th>
+                      <th>Exposure</th>
+                      <th>WHO Category</th>
+                      <th>Next Dose</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="physTriageQueueBody"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="panel-card" id="physTriageFormCard">
+              <div class="panel-header">
+                <h3 class="panel-title">Doctor's Triage &amp; Dosing Form</h3>
+                <span id="physCat3ErigBadge" class="badge badge-red hidden">ERIG + Anti-Rabies Required</span>
+              </div>
+
+              <form id="physicianAssessmentForm" class="clinical-form compact-form">
+                <div class="selected-patient-banner" id="physActivePatientBanner">
+                  Select a patient from the queue to load their chart.
+                </div>
+
+                <input type="hidden" id="physSelectedPatientId" />
+
+                <div class="form-group">
+                  <label for="physWoundCategory">WHO Exposure Category *</label>
+                  <select id="physWoundCategory" required>
+                    <option value="Category I">Category I — Intact Skin / Licks (Wash Only)</option>
+                    <option value="Category II">Category II — Non-Bleeding Abrasion or Scratch (PVRV)</option>
+                    <option value="Category III">Category III — Transdermal Bite or Saliva on Mucosa (PVRV + ERIG)</option>
+                  </select>
+                  <div id="physCategoryClinicalHint" class="clinical-hint-banner">
+                    Anti-Rabies vaccine schedule (Days 0, 3, 7, 14, 28)
+                  </div>
+                </div>
+
+                <div class="grid-2" id="physDosingFieldsRow">
+                  <div class="form-group">
+                    <label for="physDoseDaySelect">Dose Milestone to Administer *</label>
+                    <select id="physDoseDaySelect">
+                      <option value="Day 0">Day 0 (Initial Walk-In Dose)</option>
+                      <option value="Day 3">Day 3 (+3 Days Follow-Up)</option>
+                      <option value="Day 7">Day 7 (+7 Days Follow-Up)</option>
+                      <option value="Day 14">Day 14 (+14 Days Follow-Up)</option>
+                      <option value="Day 28">Day 28 (+28 Days Final Dose)</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label for="physVaccineSelect">Biologic Vial Administered *</label>
+                    <select id="physVaccineSelect">
+                      <option value="anti-rabies">anti-rabies (Verorab / Speeda)</option>
+                      <option value="anti-tetanus">anti-tetanus (Tetavax 0.5mL)</option>
+                      <option value="ERIG">ERIG (Equirab 200 IU/mL)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label for="physAllergyNotes">Equine Skin Test &amp; Allergy History</label>
+                  <textarea
+                    id="physAllergyNotes"
+                    rows="2"
+                    placeholder="e.g., Negative equine skin test (0.1 mL ID); no drug allergies"
+                  ></textarea>
+                </div>
+
+                <div class="form-group">
+                  <label for="physClinicalNotes">Physician Treatment Notes</label>
+                  <textarea
+                    id="physClinicalNotes"
+                    rows="2"
+                    placeholder="e.g., Wound washed with soap and water for 15 minutes; ERIG infiltrated around wound margins."
+                  ></textarea>
+                </div>
+
+                <div class="form-actions-row">
+                  <button type="submit" class="btn btn-primary" id="physAdministerAndTriageBtn">
+                    Log Dose &amp; Update Chart
+                  </button>
+                  <button type="button" class="btn btn-secondary" id="physSaveTriageOnlyBtn">
+                    Save Notes Only
+                  </button>
+                  <button type="button" class="btn btn-secondary" id="resetPhysTriageFormBtn">
+                    Reset
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </section>
+
+        <section id="viewPhysRecords" class="ehr-view hidden">
+          <div class="view-header-bar">
+            <div>
+              <h2 class="view-heading">Patient PEP Records — Barangay D.S. Garcia</h2>
+            </div>
+          </div>
+
+          <div class="panel-card">
+            <div class="toolbar-row">
+              <div class="filter-tabs" id="physRecordsFilterTabs">
+                <button type="button" class="filter-tab active" data-phys-rec-filter="All">All</button>
+                <button type="button" class="filter-tab" data-phys-rec-filter="Waiting for Doctor">Waiting</button>
+                <button type="button" class="filter-tab" data-phys-rec-filter="Due Today">Due Today</button>
+                <button type="button" class="filter-tab" data-phys-rec-filter="Category III">Category III</button>
+                <button type="button" class="filter-tab" data-phys-rec-filter="Missed Dose">Missed / Overdue</button>
+              </div>
+              <input
+                type="text"
+                id="physSearchInput"
+                class="search-input"
+                placeholder="Search by ID, Patient Name, or Purok..."
+              />
+            </div>
+
+            <div class="table-container">
+              <table class="clinical-table">
+                <thead>
+                  <tr>
+                    <th class="col-id">Registry ID</th>
+                    <th>Patient &amp; Purok</th>
+                    <th>Exposure &amp; Clinical Notes</th>
+                    <th>WHO Category</th>
+                    <th>5-Dose PEP Schedule</th>
+                  </tr>
+                </thead>
+                <tbody id="physRecordsTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section id="viewPhysInventory" class="ehr-view hidden">
+          <div class="view-header-bar">
+            <div>
+              <h2 class="view-heading">Vaccine Stock &amp; Expiry</h2>
+            </div>
+          </div>
+
+          <div class="panel-card">
+            <div class="table-container">
+              <table class="clinical-table">
+                <thead>
+                  <tr>
+                    <th>Vaccine Type</th>
+                    <th>Brand Name</th>
+                    <th class="num-col">Batch Lot ID</th>
+                    <th class="num-col">Available Vials</th>
+                    <th class="num-col">Safety Threshold</th>
+                    <th class="num-col">Expiry Date</th>
+                    <th>Stock Status</th>
+                  </tr>
+                </thead>
+                <tbody id="physReadOnlyInventoryBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section id="viewAdminOverview" class="ehr-view hidden">
+          <div class="view-header-bar">
+            <div>
+              <h2 class="view-heading">Clinic Overview — Barangay D.S. Garcia ABTC</h2>
+            </div>
+            <div class="view-header-actions">
+              <button
+                type="button"
+                class="btn btn-primary"
+                id="quickJumpRestockBtn"
+                data-jump-nav="viewAdminInventory"
+                data-focus-input="invBrandName"
+              >
+                Restock Vaccine Vials
+              </button>
+              <button
+                type="button"
+                class="btn btn-secondary"
+                id="quickJumpForecastBtn"
+                data-jump-nav="viewAdminForecast"
+              >
+                View Forecast
+              </button>
+            </div>
+          </div>
+
+          <div class="kpi-grid">
+            <div class="kpi-card kpi-clickable" data-jump-nav="viewAdminRegistry">
+              <span class="kpi-label">Active PEP Patients</span>
+              <strong class="kpi-value tabular-num" id="adminKpiPatients">0</strong>
+              <span class="kpi-meta">Barangay D.S. Garcia registry</span>
+            </div>
+            <div class="kpi-card kpi-clickable" data-jump-nav="viewAdminInventory">
+              <span class="kpi-label">Anti-Rabies Vials (PVRV)</span>
+              <strong class="kpi-value tabular-num" id="adminKpiRabies">0</strong>
+              <span class="kpi-meta">Verorab &amp; Speeda batches</span>
+            </div>
+            <div class="kpi-card kpi-card-alert kpi-clickable" data-jump-nav="viewAdminInventory">
+              <span class="kpi-label">Equine Immunoglobulin (ERIG)</span>
+              <strong class="kpi-value text-red tabular-num" id="adminKpiErig">0</strong>
+              <span class="kpi-meta">Equirab 200 IU/mL stock</span>
+            </div>
+            <div class="kpi-card kpi-clickable" data-jump-nav="viewAdminStaff">
+              <span class="kpi-label">Authorized Clinic Staff</span>
+              <strong class="kpi-value tabular-num" id="adminKpiStaffCount">0</strong>
+              <span class="kpi-meta">Role-restricted accounts</span>
+            </div>
+          </div>
+
+          <div class="split-grid-58-42">
+            <div class="panel-card">
+              <div class="panel-header">
+                <h3 class="panel-title">Recent Clinic Activity</h3>
+              </div>
+              <div class="table-container">
+                <table class="clinical-table">
+                  <thead>
+                    <tr>
+                      <th class="num-col">Timestamp</th>
+                      <th>Role</th>
+                      <th>Event</th>
+                      <th>Details</th>
+                    </tr>
+                  </thead>
+                  <tbody id="adminOverviewAuditBody"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="panel-card">
+              <div class="panel-header">
+                <h3 class="panel-title">Vaccine Stock Summary</h3>
+              </div>
+              <div class="table-container">
+                <table class="clinical-table">
+                  <thead>
+                    <tr>
+                      <th>Biologic &amp; Lot</th>
+                      <th class="num-col">Vials</th>
+                      <th class="num-col">Expiry</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="adminOverviewStockBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="viewAdminInventory" class="ehr-view hidden">
+          <div class="view-header-bar">
+            <div>
+              <h2 class="view-heading">Vaccine Stock &amp; Restocking</h2>
+            </div>
+          </div>
+
+          <div class="split-grid-65-35">
+            <div class="panel-card">
+              <div class="panel-header">
+                <h3 class="panel-title">Current Clinic Vial Stock</h3>
+              </div>
+
+              <div class="table-container">
+                <table class="clinical-table">
+                  <thead>
+                    <tr>
+                      <th>Vaccine Type</th>
+                      <th>Brand Name</th>
+                      <th class="num-col">Batch Lot ID</th>
+                      <th class="num-col">Current Vials</th>
+                      <th class="num-col">Threshold</th>
+                      <th class="num-col">Expiry Date</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="adminInventoryTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="panel-card">
+              <div class="panel-header">
+                <h3 class="panel-title">Restock Vaccine Batch</h3>
+              </div>
+
+              <form id="adminRestockForm" class="clinical-form">
+                <div class="form-group">
+                  <label for="invVaccineType">Vaccine Type *</label>
+                  <select id="invVaccineType" required>
+                    <option value="ERIG">ERIG (Equine Rabies Immunoglobulin)</option>
+                    <option value="anti-rabies">anti-rabies (Purified Vero Cell Vaccine)</option>
+                    <option value="anti-tetanus">anti-tetanus (Tetanus Toxoid)</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label for="invBrandName">Brand Name *</label>
+                  <input type="text" id="invBrandName" required placeholder="e.g., Equirab (200 IU/mL)" />
+                </div>
+
+                <div class="grid-2">
+                  <div class="form-group">
+                    <label for="invBatchNumber">Batch Lot ID *</label>
+                    <input type="text" id="invBatchNumber" class="mono-num" required placeholder="EQB-2026-R309" />
+                  </div>
+                  <div class="form-group">
+                    <label for="invVialsAdded">Vials to Add *</label>
+                    <input type="number" id="invVialsAdded" class="tabular-num" min="1" value="25" required />
+                  </div>
+                </div>
+
+                <div class="grid-2">
+                  <div class="form-group">
+                    <label for="invThreshold">Low-Stock Alert Threshold *</label>
+                    <input type="number" id="invThreshold" class="tabular-num" min="1" value="10" required />
+                  </div>
+                  <div class="form-group">
+                    <label for="invExpirationDate">Expiration Date *</label>
+                    <input type="date" id="invExpirationDate" class="mono-num" required />
+                  </div>
+                </div>
+
+                <div class="form-actions-row">
+                  <button type="submit" class="btn btn-primary" id="submitRestockBatchBtn">
+                    Add Vials to Stock
+                  </button>
+                  <button type="button" class="btn btn-secondary" id="resetRestockFormBtn">
+                    Reset
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </section>
+
+        <section id="viewAdminForecast" class="ehr-view hidden">
+          <div class="view-header-bar">
+            <div>
+              <h2 class="view-heading">Monthly Stock Forecast — Barangay D.S. Garcia</h2>
+            </div>
+            <div class="view-header-actions">
+              <button type="button" class="btn btn-primary" id="refreshForecastBtn">
+                Update Forecast
+              </button>
+            </div>
+          </div>
+
+          <div class="panel-card mb-16">
+            <div class="panel-header">
+              <h3 class="panel-title">Current Stock vs. 30-Day &amp; 90-Day Projected Demand</h3>
+            </div>
+
+            <div class="table-container">
+              <table class="clinical-table forecast-fit-table">
+                <thead>
+                  <tr>
+                    <th>Vaccine &amp; Brand</th>
+                    <th class="num-col">In Stock</th>
+                    <th class="num-col">Returning (30d)</th>
+                    <th class="num-col">New Walk-Ins</th>
+                    <th class="num-col">30-Day Demand</th>
+                    <th class="num-col">90-Day Demand</th>
+                    <th class="num-col">Days Left</th>
+                    <th class="num-col">Restock Qty</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="forecastVialsTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="split-grid-50-50">
+            <div class="panel-card">
+              <div class="panel-header">
+                <h3 class="panel-title">Bite Incidents by Purok (Barangay D.S. Garcia)</h3>
+              </div>
+
+              <div class="table-container">
+                <table class="clinical-table forecast-fit-table">
+                  <thead>
+                    <tr>
+                      <th>Purok Location</th>
+                      <th class="num-col">Cat I</th>
+                      <th class="num-col">Cat II</th>
+                      <th class="num-col">Cat III</th>
+                      <th class="num-col">Total</th>
+                      <th>Common Animal</th>
+                      <th>Alert Level</th>
+                    </tr>
+                  </thead>
+                  <tbody id="forecastPurokTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="panel-card">
+              <div class="panel-header">
+                <h3 class="panel-title">Exposure Category Summary &amp; Weekly Vial Usage</h3>
+              </div>
+
+              <div class="table-container mb-16">
+                <table class="clinical-table forecast-fit-table">
+                  <thead>
+                    <tr>
+                      <th>Category</th>
+                      <th>Standard Clinic Protocol</th>
+                      <th class="num-col">Cases</th>
+                      <th class="num-col">Share</th>
+                    </tr>
+                  </thead>
+                  <tbody id="forecastCategoryTableBody"></tbody>
+                </table>
+              </div>
+
+              <div class="panel-subheader-title">Weekly Walk-In &amp; Vial Usage</div>
+              <div class="table-container">
+                <table class="clinical-table forecast-fit-table">
+                  <thead>
+                    <tr>
+                      <th>Week Period</th>
+                      <th class="num-col">Walk-Ins</th>
+                      <th class="num-col">Cat III Cases</th>
+                      <th class="num-col">Vials Used</th>
+                    </tr>
+                  </thead>
+                  <tbody id="forecastWeeklyTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="viewAdminRegistry" class="ehr-view hidden">
+          <div class="view-header-bar">
+            <div>
+              <h2 class="view-heading">Patient Registry</h2>
+            </div>
+          </div>
+
+          <div class="panel-card">
+            <div class="toolbar-row">
+              <div class="filter-tabs" id="adminRegistryFilterTabs">
+                <button type="button" class="filter-tab active" data-admin-reg-filter="All">All</button>
+                <button type="button" class="filter-tab" data-admin-reg-filter="Waiting for Doctor">Waiting</button>
+                <button type="button" class="filter-tab" data-admin-reg-filter="Due Today">Due Today</button>
+                <button type="button" class="filter-tab" data-admin-reg-filter="Category III">Category III</button>
+                <button type="button" class="filter-tab" data-admin-reg-filter="Missed Dose">Missed / Overdue</button>
+              </div>
+              <input
+                type="text"
+                id="adminRegistrySearchInput"
+                class="search-input"
+                placeholder="Search registry by Patient Name, ID, or Purok..."
+              />
+            </div>
+
+            <div class="table-container">
+              <table class="clinical-table">
+                <thead>
+                  <tr>
+                    <th class="col-id">Registry ID</th>
+                    <th>Patient &amp; Purok</th>
+                    <th>Exposure &amp; Clinical Notes</th>
+                    <th>WHO Category</th>
+                    <th>5-Dose PEP Schedule</th>
+                  </tr>
+                </thead>
+                <tbody id="adminRegistryTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section id="viewAdminStaff" class="ehr-view hidden">
+          <div class="view-header-bar">
+            <div>
+              <h2 class="view-heading">Staff Accounts</h2>
+            </div>
+          </div>
+
+          <div class="split-grid-40-60">
+            <div class="panel-card">
+              <div class="panel-header">
+                <h3 class="panel-title" id="staffFormHeading">Add Staff Account</h3>
+              </div>
+
+              <form id="adminOnboardStaffForm" class="clinical-form">
+                <input type="hidden" id="staffEditId" value="" />
+                <div class="form-group">
+                  <label for="staffFullName">Full Name *</label>
+                  <input type="text" id="staffFullName" required placeholder="e.g., Dr. Camille Mendoza" />
+                </div>
+
+                <div class="form-group">
+                  <label for="staffEmail">Clinic Email Address *</label>
+                  <input type="email" id="staffEmail" required placeholder="cmendoza@drpauclinic.ph" />
+                </div>
+
+                <div class="grid-2">
+                  <div class="form-group">
+                    <label for="staffPassword" id="staffPasswordLabel">Password (min 8 chars) *</label>
+                    <input type="password" id="staffPassword" minlength="8" required placeholder="Minimum 8 characters" />
+                  </div>
+                  <div class="form-group">
+                    <label for="staffRole">Role *</label>
+                    <select id="staffRole" required>
+                      <option value="Receptionist">Receptionist</option>
+                      <option value="Physician">Physician</option>
+                      <option value="SuperAdmin">SuperAdmin</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="form-actions-row">
+                  <button type="submit" class="btn btn-primary" id="submitCreateStaffBtn">
+                    Create Staff Account
+                  </button>
+                  <button type="button" class="btn btn-secondary" id="resetStaffFormBtn">
+                    Reset
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            <div class="panel-card">
+              <div class="panel-header">
+                <h3 class="panel-title">Active Staff Directory</h3>
+              </div>
+
+              <div class="table-container">
+                <table class="clinical-table">
+                  <thead>
+                    <tr>
+                      <th>Staff Member</th>
+                      <th>Clinic Email</th>
+                      <th>Role</th>
+                      <th>Status</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="adminStaffTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <footer class="ehr-footer">
+        <span><strong>DR. PAU MEDICAL CENTER INC.</strong> — Primary Care Clinic &amp; Animal Bite Center (Barangay D.S. Garcia, Cabanatuan City)</span>
+        <span class="footer-motto">"TRUSTED CARE, EXCELLENT SERVICE."</span>
+      </footer>
+    </div>
+  </div>
+
+  <div id="doseConfirmationModal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 class="modal-heading" id="doseModalTitle">Record PEP Dose Administration</h3>
+      </div>
+      <div class="modal-body">
+        <p class="modal-description">
+          Confirming marks this scheduled dose as <strong>Completed</strong> and deducts <strong>1 vial</strong> from stock.
+        </p>
+
+        <div class="form-group mt-12">
+          <label for="modalVaccineSelect">Vaccine Vial Administered</label>
+          <select id="modalVaccineSelect">
+            <option value="anti-rabies">anti-rabies — Purified Vero Cell Vaccine (Verorab / Speeda)</option>
+            <option value="anti-tetanus">anti-tetanus — Tetanus Toxoid (Tetavax 0.5mL)</option>
+            <option value="ERIG">ERIG — Equine Rabies Immunoglobulin (Equirab 200 IU/mL)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary" id="confirmFulfillDoseBtn">
+          Log Dose &amp; Deduct 1 Vial
+        </button>
+        <button type="button" class="btn btn-danger" id="confirmDefaulterDoseBtn">
+          Mark Missed / Overdue
+        </button>
+        <button type="button" class="btn btn-secondary" id="cancelDoseModalBtn">
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>
