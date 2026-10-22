@@ -10,7 +10,7 @@
     href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700&display=swap"
     rel="stylesheet"
   />
-  <link rel="stylesheet" href="/css/styles.css?v=7" />
+  <link rel="stylesheet" href="/css/styles.css?v=8" />
   <link
     rel="stylesheet"
     href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
@@ -125,11 +125,105 @@
         <div class="topbar-identity">
           <div class="topbar-title-row">
             <h1 class="topbar-title">DR. PAU MEDICAL CENTER INC.</h1>
-            <span class="topbar-motto-tag">"TRUSTED CARE, EXCELLENT SERVICE."</span>
+            <span class="topbar-motto-tag">"TRUSTED CARE, EXCELLENT SERVICE"</span>
           </div>
           <p class="topbar-subtitle" id="workspaceSubtitle">
-            Primary Care Clinic &amp; Animal Bite Center — Barangay Kapitan Pepe PEP Registry
+            Primary Care Clinic &amp; Animal Bite Center — Barangay Kapitan Pepe ABTC
           </p>
+        </div>
+
+        <!-- Global Analytics Filter Pill Bar (Matching Reference Screenshot) -->
+        <div class="topbar-filter-pill" id="analyticsFilterBar">
+          <i class="fas fa-search filter-search-icon" aria-hidden="true"></i>
+          <div class="filter-pill-item">
+            <label for="globalFilterYear">Year:</label>
+            <select id="globalFilterYear" class="filter-pill-select">
+              <option value="All" selected>All</option>
+              <option value="2026">2026</option>
+              <option value="2025">2025</option>
+              <option value="2024">2024</option>
+              <option value="2023">2023</option>
+              <option value="2022">2022</option>
+              <option value="2021">2021</option>
+            </select>
+          </div>
+          <span class="filter-pipe">|</span>
+          <div class="filter-pill-item">
+            <label for="globalFilterQuarter">Quarter:</label>
+            <select id="globalFilterQuarter" class="filter-pill-select">
+              <option value="All" selected>All</option>
+              <option value="Q1">Q1</option>
+              <option value="Q2">Q2</option>
+              <option value="Q3">Q3</option>
+              <option value="Q4">Q4</option>
+            </select>
+          </div>
+          <span class="filter-pipe">|</span>
+          <div class="filter-pill-item">
+            <label for="globalFilterMonth">Month:</label>
+            <select id="globalFilterMonth" class="filter-pill-select">
+              <option value="All" selected>All</option>
+              <option value="1">Jan</option>
+              <option value="2">Feb</option>
+              <option value="3">Mar</option>
+              <option value="4">Apr</option>
+              <option value="5">May</option>
+              <option value="6">Jun</option>
+              <option value="7">Jul</option>
+              <option value="8">Aug</option>
+              <option value="9">Sep</option>
+              <option value="10">Oct</option>
+              <option value="11">Nov</option>
+              <option value="12">Dec</option>
+            </select>
+          </div>
+          <span class="filter-pipe">|</span>
+          <div class="filter-pill-item">
+            <label for="globalFilterAnimal">Animal Type:</label>
+            <select id="globalFilterAnimal" class="filter-pill-select">
+              <option value="All" selected>All</option>
+              <option value="Cat">Cat</option>
+              <option value="Dog">Dog</option>
+              <option value="Wild">Wild</option>
+              <option value="Other">Other</option>
+              <option value="Bird">Bird</option>
+              <option value="Rabbit">Rabbit</option>
+              <option value="Reptile">Reptile</option>
+            </select>
+          </div>
+          <span class="filter-pipe">|</span>
+          <div class="filter-pill-item">
+            <label for="globalFilterOutcome">Outcome Type:</label>
+            <select id="globalFilterOutcome" class="filter-pill-select">
+              <option value="All" selected>All</option>
+              <option value="Completed">Completed</option>
+              <option value="Active">Active</option>
+              <option value="Defaulter">Defaulter</option>
+              <option value="Referred">Referred</option>
+              <option value="Cancelled">Cancelled</option>
+            </select>
+          </div>
+          <span class="filter-pipe">|</span>
+          <div class="filter-pill-item">
+            <label for="globalFilterAge">Age Group:</label>
+            <select id="globalFilterAge" class="filter-pill-select">
+              <option value="All" selected>All</option>
+              <option value="Children">Children (&lt;15yrs)</option>
+              <option value="Youth">Youth (15-54yrs)</option>
+              <option value="Adults">Adults (25-55yrs)</option>
+              <option value="Seniors">Seniors (65yrs+)</option>
+              <option value="Toddlers">Toddlers (&lt;5yrs)</option>
+            </select>
+          </div>
+          <span class="filter-pipe">|</span>
+          <div class="filter-pill-item">
+            <label for="globalFilterSex">Sex:</label>
+            <select id="globalFilterSex" class="filter-pill-select">
+              <option value="All" selected>All</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+            </select>
+          </div>
         </div>
 
         <div class="topbar-actions">
@@ -137,7 +231,7 @@
             <span class="staff-name" id="headerUserFullName"></span>
             <span class="badge badge-role" id="headerUserRoleBadge"></span>
           </div>
-          <button type="button" class="btn btn-outline-sm" id="logoutBtn">Sign Out</button>
+          <button type="button" class="btn btn-outline-sm btn-sign-out" id="logoutBtn">Sign Out</button>
         </div>
       </header>
 
@@ -684,148 +778,270 @@
             </div>
           </div>
 
-          <!-- Row 2: Inventory Health (60% demand projection / 40% lot summary) -->
-          <div class="grid-2-col">
-            <div class="panel-card">
-              <div class="panel-header">
-                <h3 class="panel-title">Current Stock vs. 30-Day &amp; 90-Day Projected Demand</h3>
-                <span class="cell-sub">Projected from walk-in and returning-patient trends</span>
+          <!-- Row 2: Visual Clinical Analytics (3-Column Layout Matching Reference Screenshot) -->
+          <div class="analytics-dashboard-3col">
+            <!-- LEFT COLUMN: Bite Distribution by Animal & Age Group -->
+            <div class="analytics-col analytics-col-left">
+              <!-- Card 1: Bite Distribution by Animal Type -->
+              <div class="panel-card chart-card analytics-card">
+                <div class="analytics-card-header">
+                  <div class="header-left">
+                    <button type="button" class="btn-crumb-back" data-reset="animal" title="Reset filter">
+                      <i class="fas fa-undo"></i> Back
+                    </button>
+                    <h3 class="panel-title">Bite Distribution by Animal Type</h3>
+                  </div>
+                  <button type="button" class="btn-card-info" data-info="animal" title="Animal bite source distribution">
+                    <i class="far fa-question-circle"></i>
+                  </button>
+                </div>
+                <div class="chart-container chart-container-donut">
+                  <canvas id="exposurePieChart" aria-label="Bite Distribution by Animal Type"></canvas>
+                </div>
+                <div class="donut-legend-2col" id="animalTypeLegend"></div>
               </div>
-              <div class="table-container table-scroll-container">
-                <table class="clinical-table forecast-fit-table">
-                  <thead>
-                    <tr>
-                      <th>Vaccine &amp; Brand</th>
-                      <th class="num-col">In Stock</th>
-                      <th class="num-col">Returning (30d)</th>
-                      <th class="num-col">New Walk-Ins</th>
-                      <th class="num-col">30-Day Demand</th>
-                      <th class="num-col">90-Day Demand</th>
-                      <th class="num-col">Days Left</th>
-                      <th class="num-col">Restock Qty</th>
-                      <th>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody id="forecastVialsTableBody"></tbody>
-                </table>
+
+              <!-- Card 2: Patient Distribution by Age group -->
+              <div class="panel-card chart-card analytics-card">
+                <div class="analytics-card-header">
+                  <div class="header-left">
+                    <button type="button" class="btn-crumb-back" data-reset="age" title="Reset filter">
+                      <i class="fas fa-undo"></i> Back
+                    </button>
+                    <h3 class="panel-title">Patient Distribution by Age group</h3>
+                  </div>
+                  <button type="button" class="btn-card-info" data-info="age" title="Demographic age distribution">
+                    <i class="far fa-question-circle"></i>
+                  </button>
+                </div>
+                <div class="chart-container chart-container-donut">
+                  <canvas id="ageGroupChart" aria-label="Patient Distribution by Age group"></canvas>
+                </div>
+                <div class="donut-legend-stacked" id="ageGroupLegend"></div>
               </div>
             </div>
 
-            <div class="panel-card">
-              <div class="panel-header">
-                <h3 class="panel-title">Vaccine Stock Summary</h3>
-                <span class="cell-sub">Biologic lots, expiry and stock alerts</span>
+            <!-- MIDDLE COLUMN: Walk-In & Outcome Trend + Top 5 Purok & Bite Severity Subgrid -->
+            <div class="analytics-col analytics-col-middle">
+              <!-- Card 1: Walk-In & Outcome Trend -->
+              <div class="panel-card chart-card analytics-card">
+                <div class="analytics-card-header">
+                  <div>
+                    <h3 class="panel-title">Walk-In &amp; Outcome Trend</h3>
+                    <div class="panel-sub-drill">Drill down: Year &gt; Quarter &gt; Month &gt; Day</div>
+                  </div>
+                  <div class="header-trend-controls">
+                    <button type="button" class="btn-crumb-back" data-reset="trend" title="Reset trend view">
+                      <i class="fas fa-undo"></i> Back
+                    </button>
+                    <div class="trend-toggle-group">
+                      <span class="trend-badge"><i class="fas fa-bars"></i> Line</span>
+                      <span class="trend-badge"><i class="fas fa-table"></i> All Data</span>
+                      <span class="trend-badge">Year <i class="fas fa-caret-down"></i></span>
+                    </div>
+                  </div>
+                </div>
+                <div class="chart-container chart-container-trend">
+                  <canvas id="weeklyTrendGraph" aria-label="Walk-In &amp; Outcome Trend"></canvas>
+                </div>
+                <div class="trend-yoy-row" id="trendYoYRow"></div>
+                <div class="trend-footer-legend" id="trendFooterLegend">
+                  <span class="legend-item"><span class="legend-dot dot-purple"></span> Total Intakes</span>
+                  <span class="legend-item"><span class="legend-dot dot-lavender"></span> Total Outcomes</span>
+                  <span class="legend-item"><span class="legend-dot dot-green"></span> YoY% Intakes</span>
+                </div>
               </div>
-              <div class="table-container table-scroll-container">
-                <table class="clinical-table">
-                  <thead>
-                    <tr>
-                      <th>Biologic &amp; Lot</th>
-                      <th class="num-col">Vials</th>
-                      <th class="num-col">Expiry</th>
-                      <th>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody id="adminOverviewStockBody"></tbody>
-                </table>
+
+              <!-- Middle Subgrid: Purok Locations & Bite Severity -->
+              <div class="middle-subgrid-2col">
+                <!-- Subcard 1: Intake Volume by Top 5 Purok Locations -->
+                <div class="panel-card chart-card analytics-card">
+                  <div class="analytics-card-header">
+                    <div class="header-left">
+                      <button type="button" class="btn-crumb-back" data-reset="purok" title="Reset filter">
+                        <i class="fas fa-undo"></i> Back
+                      </button>
+                      <h3 class="panel-title">Intake Volume by Top 5 Purok Locations</h3>
+                    </div>
+                    <button type="button" class="btn-card-info" data-info="purok" title="Purok intake volume">
+                      <i class="far fa-question-circle"></i>
+                    </button>
+                  </div>
+                  <div class="chart-container chart-container-hbar">
+                    <canvas id="purokChart" aria-label="Intake Volume by Top 5 Purok Locations"></canvas>
+                  </div>
+                </div>
+
+                <!-- Subcard 2: Intake Volume by Bite Severity -->
+                <div class="panel-card chart-card analytics-card">
+                  <div class="analytics-card-header">
+                    <div class="header-left">
+                      <button type="button" class="btn-crumb-back" data-reset="severity" title="Reset filter">
+                        <i class="fas fa-undo"></i> Back
+                      </button>
+                      <h3 class="panel-title">Intake Volume by Bite Severity</h3>
+                    </div>
+                    <button type="button" class="btn-card-info" data-info="severity" title="WHO Category bite severity">
+                      <i class="far fa-question-circle"></i>
+                    </button>
+                  </div>
+                  <div class="chart-container chart-container-hbar">
+                    <canvas id="biteSeverityChart" aria-label="Intake Volume by Bite Severity"></canvas>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- RIGHT COLUMN: Seasonal & Daily Intake Patterns + Treatment Outcomes -->
+            <div class="analytics-col analytics-col-right">
+              <!-- Card 1: Seasonal & Daily Intake Patterns -->
+              <div class="panel-card chart-card analytics-card">
+                <div class="analytics-card-header">
+                  <h3 class="panel-title">Seasonal &amp; Daily Intake Patterns</h3>
+                </div>
+                <div class="heatmap-container-box">
+                  <table class="heatmap-matrix-table" id="seasonalHeatmapGrid"></table>
+                </div>
+                <!-- Preserved canvas peakTrafficChart hidden or synced for tests -->
+                <div class="hidden">
+                  <canvas id="peakTrafficChart"></canvas>
+                </div>
+              </div>
+
+              <!-- Card 2: Most Common Treatment Outcomes -->
+              <div class="panel-card chart-card analytics-card">
+                <div class="analytics-card-header">
+                  <div class="header-left">
+                    <button type="button" class="btn-crumb-back" data-reset="outcomes" title="Reset filter">
+                      <i class="fas fa-undo"></i> Back
+                    </button>
+                    <h3 class="panel-title">Most Common Treatment Outcomes</h3>
+                  </div>
+                  <button type="button" class="btn-card-info" data-info="outcomes" title="Treatment regimen compliance and outcomes">
+                    <i class="far fa-question-circle"></i>
+                  </button>
+                </div>
+                <div class="chart-container chart-container-hbar">
+                  <canvas id="doseFunnelChart" aria-label="Most Common Treatment Outcomes"></canvas>
+                </div>
               </div>
             </div>
           </div>
 
-          <!-- Row 3: Master Analytics Graphs (Purok, Exposure Category, Weekly Trend) -->
-          <div class="analytics-grid-2x2">
-            <div class="panel-card chart-card">
-              <div class="panel-header">
-                <h3 class="panel-title">Bite Incidents by Purok (Barangay Kapitan Pepe)</h3>
-                <span class="cell-sub">WHO Exposure Category breakdown across Kapitan Pepe puroks</span>
+          <!-- Row 3: Operational Logistics, Vaccine Forecast & System Audit -->
+          <div class="panel-card operations-card-collapsible">
+            <div class="panel-header operations-header-toggle" id="operationsSectionToggle">
+              <div>
+                <h3 class="panel-title">
+                  <i class="fas fa-boxes-stacked" style="color: var(--brand-purple); margin-right: 6px;"></i>
+                  Clinic Inventory Health, 90-Day Forecast &amp; Operations Activity
+                </h3>
+                <span class="cell-sub">Biologic demand projections, patient volume mix, and system audit trail</span>
               </div>
-              <div class="chart-container">
-                <canvas id="purokChart" aria-label="Bite Incidents by Purok (Stacked Bar Chart)"></canvas>
-              </div>
+              <button type="button" class="btn btn-outline-sm" id="toggleOperationsBtn">
+                <i class="fas fa-chevron-down" id="operationsChevron"></i> Toggle Details
+              </button>
             </div>
 
-            <div class="panel-card chart-card">
-              <div class="panel-header">
-                <h3 class="panel-title">Exposure Category Summary</h3>
-                <span class="cell-sub">Distribution of Category I, II, and III cases</span>
-              </div>
-              <div class="chart-container">
-                <canvas id="exposurePieChart" aria-label="Exposure Category Summary (Doughnut Chart)"></canvas>
-              </div>
-            </div>
+            <div id="operationsSectionContent">
+              <div class="grid-2-col" style="margin-top: 14px;">
+                <div class="panel-card">
+                  <div class="panel-header">
+                    <h4 class="panel-title">Current Stock vs. 30-Day &amp; 90-Day Projected Demand</h4>
+                    <span class="cell-sub">Projected from walk-in and returning-patient trends</span>
+                  </div>
+                  <div class="table-container table-scroll-container">
+                    <table class="clinical-table forecast-fit-table">
+                      <thead>
+                        <tr>
+                          <th>Vaccine &amp; Brand</th>
+                          <th class="num-col">In Stock</th>
+                          <th class="num-col">Returning (30d)</th>
+                          <th class="num-col">New Walk-Ins</th>
+                          <th class="num-col">30-Day Demand</th>
+                          <th class="num-col">90-Day Demand</th>
+                          <th class="num-col">Days Left</th>
+                          <th class="num-col">Restock Qty</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody id="forecastVialsTableBody"></tbody>
+                    </table>
+                  </div>
+                </div>
 
-            <div class="panel-card chart-card" style="grid-column: 1 / -1;">
-              <div class="panel-header">
-                <h3 class="panel-title">Weekly Walk-In &amp; Vial Usage</h3>
-                <span class="cell-sub">Weekly intake against anti-rabies consumption</span>
+                <div class="panel-card">
+                  <div class="panel-header">
+                    <h4 class="panel-title">Vaccine Stock Summary</h4>
+                    <span class="cell-sub">Biologic lots, expiry and stock alerts</span>
+                  </div>
+                  <div class="table-container table-scroll-container">
+                    <table class="clinical-table">
+                      <thead>
+                        <tr>
+                          <th>Biologic &amp; Lot</th>
+                          <th class="num-col">Vials</th>
+                          <th class="num-col">Expiry</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody id="adminOverviewStockBody"></tbody>
+                    </table>
+                  </div>
+                </div>
               </div>
-              <div class="chart-container">
-                <canvas id="weeklyTrendGraph" aria-label="Weekly Walk-Ins vs Vials Used (line graph)"></canvas>
-              </div>
-              <div class="table-container table-scroll-container">
-                <table class="clinical-table forecast-fit-table">
-                  <thead>
-                    <tr>
-                      <th>Week Period</th>
-                      <th class="num-col">Walk-Ins</th>
-                      <th class="num-col">Cat III Cases</th>
-                      <th class="num-col">Vials Used</th>
-                    </tr>
-                  </thead>
-                  <tbody id="forecastWeeklyTableBody"></tbody>
-                </table>
-              </div>
-            </div>
 
-            <div class="panel-card chart-card">
-              <div class="panel-header">
-                <h3 class="panel-title">PEP Regimen Compliance (Defaulter Drop-Off)</h3>
-                <span class="cell-sub">Drop-off indicates missed doses &amp; non-compliance</span>
-              </div>
-              <div class="chart-container">
-                <canvas id="doseFunnelChart" aria-label="PEP regimen compliance funnel"></canvas>
-              </div>
-            </div>
+              <div class="grid-2-col" style="margin-top: 14px;">
+                <div class="panel-card">
+                  <div class="panel-header">
+                    <h4 class="panel-title">Weekly Walk-In &amp; Vial Usage Audit</h4>
+                    <span class="cell-sub">Intake volume against anti-rabies vial consumption</span>
+                  </div>
+                  <div class="table-container table-scroll-container">
+                    <table class="clinical-table forecast-fit-table">
+                      <thead>
+                        <tr>
+                          <th>Week Period</th>
+                          <th class="num-col">Walk-Ins</th>
+                          <th class="num-col">Cat III Cases</th>
+                          <th class="num-col">Vials Used</th>
+                        </tr>
+                      </thead>
+                      <tbody id="forecastWeeklyTableBody"></tbody>
+                    </table>
+                  </div>
+                </div>
 
-            <div class="panel-card chart-card">
-              <div class="panel-header">
-                <h3 class="panel-title">Peak Clinic Traffic by Day</h3>
-                <span class="cell-sub">Patient visits by day of week (staff scheduling)</span>
+                <div class="panel-card chart-card">
+                  <div class="panel-header">
+                    <h4 class="panel-title">Daily Patient Mix: New vs. Returning</h4>
+                    <span class="cell-sub">Daily patient volume and follow-up compliance tracking</span>
+                  </div>
+                  <div class="chart-container" style="height: 180px;">
+                    <canvas id="patientMixChart" aria-label="Daily patient mix: new vs returning"></canvas>
+                  </div>
+                </div>
               </div>
-              <div class="chart-container">
-                <canvas id="peakTrafficChart" aria-label="Peak clinic traffic by day of week"></canvas>
-              </div>
-            </div>
 
-            <div class="panel-card chart-card" style="grid-column: 1 / -1;">
-              <div class="panel-header">
-                <h3 class="panel-title">Daily Patient Mix: New vs. Returning</h3>
-                <span class="cell-sub">Daily patient volume and follow-up compliance tracking</span>
+              <div class="panel-card" style="margin-top: 14px;">
+                <div class="panel-header">
+                  <h4 class="panel-title">Recent Clinic Activity</h4>
+                  <span class="cell-sub">OTP dispatches, staff logins and system events</span>
+                </div>
+                <div class="table-container table-scroll-container">
+                  <table class="clinical-table">
+                    <thead>
+                      <tr>
+                        <th class="num-col">Timestamp</th>
+                        <th>Role</th>
+                        <th>Event</th>
+                        <th>Details</th>
+                      </tr>
+                    </thead>
+                    <tbody id="adminOverviewAuditBody"></tbody>
+                  </table>
+                </div>
               </div>
-              <div class="chart-container">
-                <canvas id="patientMixChart" aria-label="Daily patient mix: new vs returning"></canvas>
-              </div>
-            </div>
-          </div>
-
-          <!-- Row 4: System Audit Trail (full width) -->
-          <div class="panel-card">
-            <div class="panel-header">
-              <h3 class="panel-title">Recent Clinic Activity</h3>
-              <span class="cell-sub">OTP dispatches, staff logins and system events</span>
-            </div>
-            <div class="table-container table-scroll-container">
-              <table class="clinical-table">
-                <thead>
-                  <tr>
-                    <th class="num-col">Timestamp</th>
-                    <th>Role</th>
-                    <th>Event</th>
-                    <th>Details</th>
-                  </tr>
-                </thead>
-                <tbody id="adminOverviewAuditBody"></tbody>
-              </table>
             </div>
           </div>
         </section>
@@ -1167,6 +1383,6 @@
     </div>
   </div>
 
-  <script src="/js/app.js?v=34"></script>
+  <script src="/js/app.js?v=35"></script>
 </body>
 </html>

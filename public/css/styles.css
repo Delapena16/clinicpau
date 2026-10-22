@@ -747,6 +747,426 @@ td.num-col {
   align-items: start;
 }
 
+/* ==========================================================================
+   TARGET CLINICAL ANALYTICS DASHBOARD (MATCHING REFERENCE ARCHITECTURE)
+   ========================================================================== */
+
+/* Topbar & Global Filter Bar */
+.ehr-topbar {
+  background-color: #3B0D47 !important;
+  border-bottom: 1px solid #4D125C !important;
+  color: #FFFFFF !important;
+  padding: 8px 18px !important;
+  gap: 12px !important;
+}
+
+.topbar-title {
+  color: #FFFFFF !important;
+  font-size: 15px !important;
+  font-weight: 700 !important;
+}
+
+.topbar-motto-tag {
+  background: #581C6E !important;
+  color: #E9D5FF !important;
+  border: 1px solid #7E22CE !important;
+  font-size: 10px !important;
+  padding: 2px 6px !important;
+}
+
+.topbar-subtitle {
+  color: #E2D9F3 !important;
+  font-size: 11px !important;
+}
+
+.topbar-filter-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #25072F;
+  border: 1px solid #55166B;
+  border-radius: 20px;
+  padding: 4px 12px;
+  color: #CBD5E1;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.filter-search-icon {
+  color: #C084FC;
+  font-size: 11px;
+}
+
+.filter-pill-item {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.filter-pill-item label {
+  color: #E2E8F0;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.filter-pill-select {
+  background: transparent;
+  color: #FFFFFF;
+  border: none;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+  padding: 0 1px;
+}
+
+.filter-pill-select option {
+  background: #2A0A33;
+  color: #FFFFFF;
+}
+
+.filter-pipe {
+  color: #6B21A8;
+  font-size: 10px;
+  user-select: none;
+}
+
+.btn-sign-out {
+  background: #FFFFFF !important;
+  color: #1E293B !important;
+  border: 1px solid #E2E8F0 !important;
+  font-weight: 600 !important;
+  font-size: 12px !important;
+  padding: 5px 12px !important;
+  border-radius: 6px !important;
+}
+
+.btn-sign-out:hover {
+  background: #F1F5F9 !important;
+  color: #0F172A !important;
+}
+
+/* 3-Column Analytics Layout */
+.analytics-dashboard-3col {
+  display: grid;
+  grid-template-columns: 21% 49% 29%;
+  gap: 12px;
+  margin-bottom: 20px;
+  align-items: stretch;
+}
+
+@media (max-width: 1280px) {
+  .analytics-dashboard-3col {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 860px) {
+  .analytics-dashboard-3col {
+    grid-template-columns: 1fr;
+  }
+}
+
+.analytics-col {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* Card Styling & Headers */
+.analytics-card {
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+.analytics-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.analytics-card-header .header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.panel-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #1E293B;
+  margin: 0;
+}
+
+.panel-sub-drill {
+  font-size: 11px;
+  color: #64748B;
+  font-weight: 500;
+}
+
+/* Back Button & Help Button */
+.btn-crumb-back {
+  background: transparent;
+  border: none;
+  color: #64748B;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  text-align: left;
+}
+
+.btn-crumb-back:hover {
+  color: #3B0D47;
+  text-decoration: underline;
+}
+
+.btn-card-info {
+  background: transparent;
+  border: none;
+  color: #94A3B8;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-card-info:hover {
+  color: #3B0D47;
+}
+
+/* Donut Chart Containers & Legends */
+.chart-container-donut {
+  height: 155px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.donut-legend-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 10px;
+  margin-top: 8px;
+  font-size: 11px;
+  color: #334155;
+}
+
+.donut-legend-stacked {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 8px;
+  font-size: 11px;
+  color: #334155;
+}
+
+.legend-badge-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.legend-color-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Middle Column Trend Chart */
+.chart-container-trend {
+  height: 165px;
+  position: relative;
+}
+
+.header-trend-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.trend-toggle-group {
+  display: inline-flex;
+  align-items: center;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.trend-badge {
+  font-size: 10.5px;
+  color: #475569;
+  padding: 2px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.trend-badge:hover {
+  background: #E2E8F0;
+  color: #1E293B;
+}
+
+/* YoY% pills row above/below chart */
+.trend-yoy-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 38px 0 28px;
+  margin-top: -6px;
+}
+
+.yoy-pill {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 4px;
+  border-radius: 3px;
+  color: #FFFFFF;
+  line-height: 1.2;
+}
+
+.yoy-red {
+  background-color: #EF4444;
+}
+
+.yoy-green {
+  background-color: #22C55E;
+}
+
+.trend-footer-legend {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 16px;
+  margin-top: 8px;
+  font-size: 11px;
+  color: #475569;
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 500;
+}
+
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.dot-purple { background-color: #3B0D47; }
+.dot-lavender { background-color: #C084FC; }
+.dot-green { background-color: #22C55E; }
+
+/* Middle Subgrid: 2 Columns */
+.middle-subgrid-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 640px) {
+  .middle-subgrid-2col {
+    grid-template-columns: 1fr;
+  }
+}
+
+.chart-container-hbar {
+  height: 170px;
+  position: relative;
+}
+
+/* Seasonal Heatmap Matrix Table */
+.heatmap-container-box {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.heatmap-matrix-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 2px;
+  font-size: 10.5px;
+  text-align: center;
+  table-layout: fixed;
+}
+
+.heatmap-matrix-table th {
+  padding: 4px 2px;
+  font-weight: 600;
+  color: #64748B;
+  background: transparent;
+  border: none;
+  font-size: 10px;
+}
+
+.heatmap-matrix-table td {
+  padding: 5px 2px;
+  border: none;
+  border-radius: 2px;
+  color: #FFFFFF;
+  font-size: 9.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.heatmap-matrix-table td:hover {
+  transform: scale(1.15);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
+  z-index: 2;
+  position: relative;
+}
+
+.heatmap-day-label {
+  color: #334155;
+  font-weight: 600;
+  text-align: left;
+  padding-left: 2px !important;
+  background: transparent !important;
+  cursor: default !important;
+}
+
+/* Operations Collapsible Section */
+.operations-card-collapsible {
+  margin-top: 14px;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  background: #FFFFFF;
+}
+
+.operations-header-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+}
+
 /* --- Clinic Overview layout (SuperAdmin) --- */
 .analytics-grid-2x2 {
   display: grid;
