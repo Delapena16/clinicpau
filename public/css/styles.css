@@ -757,13 +757,39 @@ td.num-col {
   border-bottom: 1px solid #4D125C !important;
   color: #FFFFFF !important;
   padding: 8px 18px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
   gap: 12px !important;
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
+  scrollbar-width: none !important;
+}
+
+.ehr-topbar::-webkit-scrollbar {
+  display: none;
+}
+
+.topbar-identity {
+  flex-shrink: 0 !important;
+  white-space: nowrap !important;
+  min-width: 250px;
+}
+
+.topbar-title-row {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  flex-wrap: nowrap !important;
+  white-space: nowrap !important;
 }
 
 .topbar-title {
   color: #FFFFFF !important;
-  font-size: 15px !important;
+  font-size: 14.5px !important;
   font-weight: 700 !important;
+  white-space: nowrap !important;
+  margin: 0 !important;
 }
 
 .topbar-motto-tag {
@@ -772,24 +798,42 @@ td.num-col {
   border: 1px solid #7E22CE !important;
   font-size: 10px !important;
   padding: 2px 6px !important;
+  white-space: nowrap !important;
 }
 
 .topbar-subtitle {
   color: #E2D9F3 !important;
   font-size: 11px !important;
+  white-space: nowrap !important;
+  margin: 2px 0 0 0 !important;
 }
 
 .topbar-filter-pill {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: #25072F;
-  border: 1px solid #55166B;
-  border-radius: 20px;
-  padding: 4px 12px;
-  color: #CBD5E1;
-  font-size: 11px;
-  white-space: nowrap;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  background: #25072F !important;
+  border: 1px solid #55166B !important;
+  border-radius: 20px !important;
+  padding: 4px 12px !important;
+  color: #CBD5E1 !important;
+  font-size: 11px !important;
+  white-space: nowrap !important;
+  flex-shrink: 1 !important;
+  overflow-x: auto !important;
+  scrollbar-width: none !important;
+}
+
+.topbar-filter-pill::-webkit-scrollbar {
+  display: none;
+}
+
+.topbar-actions {
+  flex-shrink: 0 !important;
+  white-space: nowrap !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
 }
 
 .filter-search-icon {
@@ -957,6 +1001,7 @@ td.num-col {
   display: flex;
   align-items: center;
   justify-content: center;
+  min-height: 0 !important;
 }
 
 .donut-legend-2col {
@@ -996,6 +1041,7 @@ td.num-col {
 .chart-container-trend {
   height: 165px;
   position: relative;
+  min-height: 0 !important;
 }
 
 .header-trend-controls {
@@ -1087,6 +1133,12 @@ td.num-col {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
+  min-width: 0;
+}
+
+.middle-subgrid-2col > div {
+  min-width: 0;
+  overflow: hidden;
 }
 
 @media (max-width: 640px) {
@@ -1096,8 +1148,11 @@ td.num-col {
 }
 
 .chart-container-hbar {
-  height: 170px;
+  height: 185px;
   position: relative;
+  width: 100%;
+  min-width: 0;
+  min-height: 0 !important;
 }
 
 /* Seasonal Heatmap Matrix Table */
