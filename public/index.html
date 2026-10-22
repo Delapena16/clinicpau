@@ -10,7 +10,7 @@
     href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700&display=swap"
     rel="stylesheet"
   />
-  <link rel="stylesheet" href="/css/styles.css?v=9" />
+  <link rel="stylesheet" href="/css/styles.css?v=10" />
   <link
     rel="stylesheet"
     href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
@@ -182,25 +182,23 @@
             <label for="globalFilterAnimal">Animal Type:</label>
             <select id="globalFilterAnimal" class="filter-pill-select">
               <option value="All" selected>All</option>
-              <option value="Cat">Cat</option>
               <option value="Dog">Dog</option>
-              <option value="Wild">Wild</option>
+              <option value="Stray Dog">Stray Dog</option>
+              <option value="Cat">Cat</option>
+              <option value="Stray Cat">Stray Cat</option>
               <option value="Other">Other</option>
-              <option value="Bird">Bird</option>
-              <option value="Rabbit">Rabbit</option>
-              <option value="Reptile">Reptile</option>
             </select>
           </div>
           <span class="filter-pipe">|</span>
           <div class="filter-pill-item">
-            <label for="globalFilterOutcome">Outcome Type:</label>
+            <label for="globalFilterOutcome">Status:</label>
             <select id="globalFilterOutcome" class="filter-pill-select">
               <option value="All" selected>All</option>
+              <option value="Waiting for Doctor">Waiting for Doctor</option>
+              <option value="Due Today">Due Today</option>
+              <option value="Ongoing Schedule">Ongoing Schedule</option>
+              <option value="Missed Dose">Missed Dose</option>
               <option value="Completed">Completed</option>
-              <option value="Active">Active</option>
-              <option value="Defaulter">Defaulter</option>
-              <option value="Referred">Referred</option>
-              <option value="Cancelled">Cancelled</option>
             </select>
           </div>
           <span class="filter-pipe">|</span>
@@ -209,10 +207,9 @@
             <select id="globalFilterAge" class="filter-pill-select">
               <option value="All" selected>All</option>
               <option value="Children">Children (&lt;15yrs)</option>
-              <option value="Youth">Youth (15-54yrs)</option>
-              <option value="Adults">Adults (25-55yrs)</option>
-              <option value="Seniors">Seniors (65yrs+)</option>
-              <option value="Toddlers">Toddlers (&lt;5yrs)</option>
+              <option value="Youth">Youth (15-24yrs)</option>
+              <option value="Adults">Adults (25-54yrs)</option>
+              <option value="Seniors">Seniors (55yrs+)</option>
             </select>
           </div>
           <span class="filter-pipe">|</span>
@@ -1383,6 +1380,6 @@
     </div>
   </div>
 
-  <script src="/js/app.js?v=36"></script>
+  <script src="/js/app.js?v=37"></script>
 </body>
 </html>
