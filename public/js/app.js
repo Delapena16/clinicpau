@@ -553,23 +553,44 @@ function formatTriageArrivalTime(isoString) {
   }
 }
 
+const CANONICAL_PUROK_MAP = {
+  '1': 'Purok 1 (Centro)',
+  '2': 'Purok 2 (Mabini Ext.)',
+  '3': 'Purok 3 (Rizal St.)',
+  '4': 'Purok 4 (Del Pilar)',
+  '5': 'Purok 5 (Maharlika)',
+  '6': 'Purok 6 (Riverbank)',
+  '7': 'Purok 7 (Narra St.)'
+};
+
+function normalizePurokName(rawPurok) {
+  const str = String(rawPurok || '').trim();
+  if (!str) return 'Purok 1 (Centro)';
+  const match = str.match(/purok\s*([1-7])\b/i);
+  if (match && CANONICAL_PUROK_MAP[match[1]]) {
+    return CANONICAL_PUROK_MAP[match[1]];
+  }
+  return str.split(',')[0].trim() || 'Purok 1 (Centro)';
+}
+
 function renderLiveTriageQueue() {
   const triageBody = document.getElementById('adminOverviewTriageBody');
   const triageCountEl = document.getElementById('adminOverviewTriageCount');
   if (!triageBody) return;
 
   const live = clinicAppState.dashboardSummary;
-  let queue = live && Array.isArray(live.triageQueue) ? live.triageQueue : null;
+  let rawQueue = live && Array.isArray(live.triageQueue) ? live.triageQueue : null;
 
   // Resilient fallback from live patient records if summary is pending or offline
-  if (!queue) {
+  if (!rawQueue) {
     const patients = clinicAppState.patients || [];
-    queue = patients
+    rawQueue = patients
       .filter(
         (p) =>
-          p.woundCategory === 'Pending' ||
-          ['Waiting for Doctor', 'Needs Triage'].includes(p.clinicalStatus) ||
-          p.checkedInForTriage === true
+          !['Completed', 'Wound Cleansing Only'].includes(p.clinicalStatus) &&
+          (p.woundCategory === 'Pending' ||
+            ['Waiting for Doctor', 'Needs Triage'].includes(p.clinicalStatus) ||
+            p.checkedInForTriage === true)
       )
       .sort(
         (a, b) =>
@@ -580,10 +601,20 @@ function renderLiveTriageQueue() {
         id: p.patientId,
         name: p.fullName,
         animalType: p.animalType || 'Domestic Dog',
-        purok: p.purok || p.barangay || 'Purok 1, Kapitan Pepe',
+        purok: normalizePurokName(p.purok || p.barangay || 'Purok 1 (Centro)'),
         arrivalTime: (p.createdAt ? new Date(p.createdAt) : new Date(p.day0WalkInDate || Date.now())).toISOString()
       }));
   }
+
+  // Deduplicate by patient ID while preserving FIFO arrival order
+  const seenTriageIds = new Set();
+  const queue = [];
+  (rawQueue || []).forEach((item) => {
+    const pid = item.id || item.patientId || '';
+    if (pid && seenTriageIds.has(pid)) return;
+    if (pid) seenTriageIds.add(pid);
+    queue.push(item);
+  });
 
   if (triageCountEl) {
     triageCountEl.textContent = `${queue.length} Waiting`;
@@ -611,7 +642,7 @@ function renderLiveTriageQueue() {
       const safeId = escapeHtml(item.id || '');
       const safeName = escapeHtml(item.name || '');
       const safeVector = escapeHtml(item.animalType || 'Domestic Dog');
-      const safePurok = escapeHtml(item.purok || 'Purok 1, Kapitan Pepe');
+      const safePurok = escapeHtml(normalizePurokName(item.purok || 'Purok 1 (Centro)'));
 
       return `
         <tr class="patient-row" data-patient-id="${safeId}">
@@ -645,13 +676,14 @@ function renderActionableDefaulters() {
   if (!defaultersBody) return;
 
   const live = clinicAppState.dashboardSummary;
-  let defaulters = live && Array.isArray(live.defaulters) ? live.defaulters : null;
+  let rawDefaulters = live && Array.isArray(live.defaulters) ? live.defaulters : null;
 
   // Resilient fallback from patient schedules
-  if (!defaulters) {
+  if (!rawDefaulters) {
     const today = todayDateIso;
     const list = [];
     (clinicAppState.patients || []).forEach((p) => {
+      if (['Completed', 'Wound Cleansing Only'].includes(p.clinicalStatus)) return;
       const missedList = (p.pepSchedule || []).filter((d) => {
         if (d.status === 'Defaulter') return true;
         if (d.status === 'Pending') {
@@ -686,8 +718,19 @@ function renderActionableDefaulters() {
       }
     });
     list.sort((a, b) => b.daysOverdue - a.daysOverdue);
-    defaulters = list;
+    rawDefaulters = list;
   }
+
+  // Deduplicate by patient ID and ensure descending sort by daysOverdue
+  const seenDefaulterIds = new Set();
+  const defaulters = [];
+  (rawDefaulters || []).forEach((item) => {
+    const pid = item.id || item.patientId || '';
+    if (pid && seenDefaulterIds.has(pid)) return;
+    if (pid) seenDefaulterIds.add(pid);
+    defaulters.push(item);
+  });
+  defaulters.sort((a, b) => Number(b.daysOverdue || 0) - Number(a.daysOverdue || 0));
 
   if (countEl) countEl.textContent = defaulters.length;
   if (alertBadgeEl) {
@@ -768,7 +811,7 @@ function renderActionableDefaulters() {
 function countHighSurgePuroks(patients) {
   const counts = {};
   (patients || []).forEach((p) => {
-    const key = p.purok || 'Unknown';
+    const key = normalizePurokName(p.purok || p.barangay || 'Unknown');
     counts[key] = (counts[key] || 0) + 1;
   });
   const values = Object.values(counts);
@@ -906,6 +949,51 @@ async function openAuthenticatedRoleWorkspace(user) {
   }
 }
 
+function normalizeSummaryData(summaryData) {
+  if (!summaryData || typeof summaryData !== 'object') return summaryData;
+  if (summaryData.purokOutbreaks && typeof summaryData.purokOutbreaks === 'object') {
+    const normOutbreaks = {};
+    Object.entries(summaryData.purokOutbreaks).forEach(([rawKey, cnt]) => {
+      const canon = normalizePurokName(rawKey);
+      normOutbreaks[canon] = (normOutbreaks[canon] || 0) + Number(cnt || 0);
+    });
+    summaryData.purokOutbreaks = normOutbreaks;
+    const pCounts = Object.values(normOutbreaks);
+    if (pCounts.length > 0) {
+      const mean = pCounts.reduce((a, b) => a + b, 0) / pCounts.length;
+      summaryData.highSurgePuroks = pCounts.filter((c) => c > mean).length;
+    }
+  }
+  if (Array.isArray(summaryData.triageQueue)) {
+    const seenTriage = new Set();
+    summaryData.triageQueue = summaryData.triageQueue
+      .filter((item) => {
+        const key = item && (item.id || item.patientId);
+        if (!key || seenTriage.has(key)) return false;
+        seenTriage.add(key);
+        return true;
+      })
+      .map((item) => ({
+        ...item,
+        purok: normalizePurokName(item.purok || 'Purok 1 (Centro)')
+      }));
+  }
+  if (Array.isArray(summaryData.defaulters)) {
+    const seenDef = new Set();
+    summaryData.defaulters = summaryData.defaulters
+      .filter((item) => {
+        const key = item && (item.id || item.patientId);
+        if (!key || seenDef.has(key)) return false;
+        seenDef.add(key);
+        return true;
+      })
+      .sort((a, b) => Number(b.daysOverdue || 0) - Number(a.daysOverdue || 0));
+    summaryData.missedDoses = summaryData.defaulters.length;
+    summaryData.missedOverdueDoses = summaryData.defaulters.length;
+  }
+  return summaryData;
+}
+
 // Fetches the live dashboard KPIs from the database and refreshes the four
 // top KPI boxes of the Clinic Overview.
 async function loadDashboardSummary() {
@@ -915,7 +1003,7 @@ async function loadDashboardSummary() {
     const json = await res.json();
     if (!json.data) return null;
 
-    clinicAppState.dashboardSummary = json.data;
+    clinicAppState.dashboardSummary = normalizeSummaryData(json.data);
 
     const setKpi = (id, value) => {
       const el = document.getElementById(id);
@@ -957,12 +1045,16 @@ async function loadDashboardSummary() {
 async function loadRoleAuthorizedData() {
   const user = clinicAppState.authenticatedUser;
   if (!user) return;
+  const normalizePatientRecord = (p) => ({
+    ...p,
+    purok: normalizePurokName(p.purok || p.barangay || 'Purok 1 (Centro)')
+  });
   try {
     if (user.role === 'Receptionist') {
       const res = await fetch('/api/receptionist/patients');
       if (res.ok) {
         const json = await res.json();
-        clinicAppState.patients = (json.data && json.data.patients) || [];
+        clinicAppState.patients = ((json.data && json.data.patients) || []).map(normalizePatientRecord);
       }
       renderReceptionistViews();
     } else if (user.role === 'Physician') {
@@ -972,7 +1064,7 @@ async function loadRoleAuthorizedData() {
       ]);
       if (patRes.ok) {
         const pJson = await patRes.json();
-        clinicAppState.patients = (pJson.data && pJson.data.patients) || [];
+        clinicAppState.patients = ((pJson.data && pJson.data.patients) || []).map(normalizePatientRecord);
       }
       if (invRes.ok) {
         const iJson = await invRes.json();
@@ -989,7 +1081,7 @@ async function loadRoleAuthorizedData() {
 
       if (patRes.ok) {
         const pJson = await patRes.json();
-        clinicAppState.patients = (pJson.data && pJson.data.patients) || [];
+        clinicAppState.patients = ((pJson.data && pJson.data.patients) || []).map(normalizePatientRecord);
       }
       if (summaryRes.ok) {
         const sJson = await summaryRes.json();
@@ -1006,7 +1098,7 @@ async function loadRoleAuthorizedData() {
       if (dashRes.ok) {
         const dJson = await dashRes.json();
         if (dJson.data) {
-          clinicAppState.dashboardSummary = dJson.data;
+          clinicAppState.dashboardSummary = normalizeSummaryData(dJson.data);
         }
       }
       renderSuperAdminViews();
@@ -1371,27 +1463,8 @@ const horizontalBarLabelPlugin = {
 
 // Dynamic Clinical Data Aggregator aligned with Filter Controls & Real Clinic Records
 function getFilteredAnalyticsContext() {
-  // Use real patient database records; fallback to authentic clinic records if empty
-  const allPatients = (clinicAppState.patients && clinicAppState.patients.length > 0)
-    ? clinicAppState.patients
-    : [
-        { patientId: 'PEP-2026-001', fullName: 'Reynaldo Sarmiento', age: 29, sex: 'Male', purok: 'Purok 1 (Centro)', animalType: 'Stray Dog', woundCategory: 'Pending', clinicalStatus: 'Waiting for Doctor', day0WalkInDate: '2026-10-22' },
-        { patientId: 'PEP-2026-002', fullName: 'Clarissa Dizon-Gomez', age: 24, sex: 'Female', purok: 'Purok 4 (Del Pilar)', animalType: 'Domestic Cat', woundCategory: 'Pending', clinicalStatus: 'Pending', day0WalkInDate: '2026-10-22' },
-        { patientId: 'PEP-2026-003', fullName: 'Mateo Villanueva', age: 19, sex: 'Male', purok: 'Purok 3 (Rizal St.)', animalType: 'Stray Dog', woundCategory: 'Category III', clinicalStatus: 'Due Today', day0WalkInDate: '2026-10-14' },
-        { patientId: 'PEP-2026-004', fullName: 'Rowena Macapagal-Ramos', age: 34, sex: 'Female', purok: 'Purok 2 (Mabini Ext.)', animalType: 'Domestic Dog', woundCategory: 'Category II', clinicalStatus: 'Due Today', day0WalkInDate: '2026-10-19' },
-        { patientId: 'PEP-2026-005', fullName: 'Teresita Manalastas', age: 48, sex: 'Female', purok: 'Purok 6 (Riverbank)', animalType: 'Stray Dog', woundCategory: 'Category III', clinicalStatus: 'Due Today', day0WalkInDate: '2026-10-19' },
-        { patientId: 'PEP-2026-006', fullName: 'Jocelyn Pineda-Castro', age: 28, sex: 'Female', purok: 'Purok 5 (Maharlika)', animalType: 'Domestic Dog', woundCategory: 'Category II', clinicalStatus: 'Due Today', day0WalkInDate: '2026-10-19' },
-        { patientId: 'PEP-2026-007', fullName: 'Danilo Pangilinan Jr.', age: 12, sex: 'Male', purok: 'Purok 7 (Narra St.)', animalType: 'Domestic Dog', woundCategory: 'Category I', clinicalStatus: 'Ongoing Schedule', day0WalkInDate: '2026-10-18' },
-        { patientId: 'PEP-2026-008', fullName: 'Eduardo Lacson', age: 55, sex: 'Male', purok: 'Purok 1 (Centro)', animalType: 'Stray Cat', woundCategory: 'Category II', clinicalStatus: 'Ongoing Schedule', day0WalkInDate: '2026-10-18' },
-        { patientId: 'PEP-2026-009', fullName: 'Marites Evangelista', age: 51, sex: 'Female', purok: 'Purok 4 (Del Pilar)', animalType: 'Stray Dog', woundCategory: 'Category III', clinicalStatus: 'Ongoing Schedule', day0WalkInDate: '2026-10-18' },
-        { patientId: 'PEP-2026-010', fullName: 'Arnel Tolentino', age: 42, sex: 'Male', purok: 'Purok 6 (Riverbank)', animalType: 'Stray Dog', woundCategory: 'Category III', clinicalStatus: 'Missed Dose', day0WalkInDate: '2026-10-14' },
-        { patientId: 'PEP-2026-011', fullName: 'Lorena Alcantara', age: 36, sex: 'Female', purok: 'Purok 3 (Rizal St.)', animalType: 'Domestic Dog', woundCategory: 'Category II', clinicalStatus: 'Completed', day0WalkInDate: '2026-09-15' },
-        { patientId: 'PEP-2026-012', fullName: 'Gabriel Bautista', age: 8, sex: 'Male', purok: 'Purok 1 (Centro)', animalType: 'Stray Dog', woundCategory: 'Category III', clinicalStatus: 'Completed', day0WalkInDate: '2026-09-10' },
-        { patientId: 'PEP-2026-013', fullName: 'Corazon Dela Cruz', age: 62, sex: 'Female', purok: 'Purok 5 (Maharlika)', animalType: 'Domestic Cat', woundCategory: 'Category I', clinicalStatus: 'Wound Cleansing Only', day0WalkInDate: '2026-10-20' },
-        { patientId: 'PEP-2026-014', fullName: 'Ferdinand Santos', age: 45, sex: 'Male', purok: 'Purok 2 (Mabini Ext.)', animalType: 'Stray Dog', woundCategory: 'Category II', clinicalStatus: 'Ongoing Schedule', day0WalkInDate: '2026-10-16' },
-        { patientId: 'PEP-2026-015', fullName: 'Rosario Mercado', age: 31, sex: 'Female', purok: 'Purok 4 (Del Pilar)', animalType: 'Domestic Dog', woundCategory: 'Category II', clinicalStatus: 'Ongoing Schedule', day0WalkInDate: '2026-10-17' },
-        { patientId: 'PEP-2026-016', fullName: 'Benigno Solis', age: 27, sex: 'Male', purok: 'Purok 2 (Mabini Ext.)', animalType: 'Domestic Dog', woundCategory: 'Category II', clinicalStatus: 'Completed', day0WalkInDate: '2026-09-22' }
-      ];
+  // Use strictly live patient database records (zero synthetic injections per AGENTS.md)
+  const allPatients = Array.isArray(clinicAppState.patients) ? clinicAppState.patients : [];
 
   const yearEl = document.getElementById('globalFilterYear');
   const quarterEl = document.getElementById('globalFilterQuarter');
@@ -1460,9 +1533,17 @@ function getFilteredAnalyticsContext() {
   }
 
   if (selectedOutcome !== 'All') {
+    const targetOut = selectedOutcome.trim().toLowerCase();
     filtered = filtered.filter((p) => {
       const st = String(p.clinicalStatus || '').trim().toLowerCase();
-      return st === selectedOutcome.toLowerCase();
+      if (st === targetOut) return true;
+      if (
+        (targetOut === 'ongoing schedule' || targetOut === 'under treatment') &&
+        (st === 'ongoing schedule' || st === 'under treatment')
+      ) {
+        return true;
+      }
+      return false;
     });
   }
 
@@ -1488,7 +1569,35 @@ function getFilteredAnalyticsContext() {
   };
 }
 
-// 1. Horizontal Bar: Intake Volume by Top 5 Purok Locations (Live Clinic Data)
+// Helper plugin to render total count in the center of Doughnut charts
+function createDoughnutCenterPlugin(totalValue, subLabel) {
+  return {
+    id: 'doughnutCenterPlugin',
+    afterDatasetsDraw(chart) {
+      const { ctx } = chart;
+      if (!ctx || typeof ctx.fillText !== 'function') return;
+      const centerX = chart.chartArea
+        ? (chart.chartArea.left + chart.chartArea.right) / 2
+        : (chart.width || 160) / 2;
+      const centerY = chart.chartArea
+        ? (chart.chartArea.top + chart.chartArea.bottom) / 2
+        : (chart.height || 140) / 2;
+
+      ctx.save();
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#1E293B';
+      ctx.font = '700 18px "Plus Jakarta Sans", Inter, sans-serif';
+      ctx.fillText(String(Number(totalValue || 0).toLocaleString()), centerX, centerY - 6);
+      ctx.fillStyle = '#64748B';
+      ctx.font = '600 8.5px Inter, sans-serif';
+      ctx.fillText(String(subLabel || 'CASES').toUpperCase(), centerX, centerY + 10);
+      ctx.restore();
+    }
+  };
+}
+
+// 1. Horizontal Bar: Intake Volume by Canonical Purok Locations (Live Clinic Data)
 function renderPurokChart() {
   const canvas = document.getElementById('purokChart');
   if (!canvas || typeof Chart === 'undefined') return;
@@ -1501,20 +1610,38 @@ function renderPurokChart() {
     myChart = null;
   }
 
-  const { filteredPatients } = getFilteredAnalyticsContext();
+  const { filteredPatients, isFiltered } = getFilteredAnalyticsContext();
 
   const purokCounts = {};
-  filteredPatients.forEach((p) => {
-    let pk = String(p.purok || 'Purok 1').trim();
-    const match = pk.match(/Purok\s*\d+/i);
-    const shortLabel = match ? match[0] : pk.split(',')[0].split('(')[0].trim();
-    purokCounts[shortLabel] = (purokCounts[shortLabel] || 0) + 1;
-  });
+  const live = !isFiltered ? normalizeSummaryData(clinicAppState.dashboardSummary) : null;
 
-  const sorted = Object.entries(purokCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  if (!isFiltered && (!clinicAppState.patients || clinicAppState.patients.length === 0) && live && live.purokOutbreaks && Object.keys(live.purokOutbreaks).length > 0) {
+    Object.entries(live.purokOutbreaks).forEach(([rawKey, cnt]) => {
+      const canon = normalizePurokName(rawKey);
+      purokCounts[canon] = (purokCounts[canon] || 0) + Number(cnt || 0);
+    });
+  } else {
+    filteredPatients.forEach((p) => {
+      const canon = normalizePurokName(p.purok || p.barangay || 'Purok 1 (Centro)');
+      purokCounts[canon] = (purokCounts[canon] || 0) + 1;
+    });
+  }
+
+  const sorted = Object.entries(purokCounts)
+    .sort((a, b) => {
+      if (b[1] !== a[1]) return b[1] - a[1];
+      return String(a[0]).localeCompare(String(b[0]), undefined, { numeric: true });
+    })
+    .slice(0, 7);
+
   const labels = sorted.map((s) => s[0]);
   const data = sorted.map((s) => s[1]);
-  const bgColors = data.map((_, idx) => (idx === 0 ? '#3B0D47' : idx === 1 ? '#581C87' : '#94A3B8'));
+  const meanVal = data.length > 0 ? data.reduce((a, b) => a + b, 0) / data.length : 0;
+  const bgColors = data.map((val, idx) => {
+    if (idx === 0) return '#3B0D47';
+    if (idx === 1 || val > meanVal) return '#6B21A8';
+    return '#94A3B8';
+  });
 
   const ctxPurok = canvas.getContext('2d');
   purokChart = new Chart(ctxPurok, {
@@ -1525,9 +1652,9 @@ function renderPurokChart() {
         {
           label: 'Intake Volume',
           data: data.length ? data : [0],
-          backgroundColor: bgColors,
+          backgroundColor: bgColors.length ? bgColors : ['#94A3B8'],
           borderRadius: 3,
-          barThickness: 14
+          barThickness: 13
         }
       ]
     },
@@ -1536,7 +1663,7 @@ function renderPurokChart() {
       responsive: true,
       maintainAspectRatio: false,
       layout: {
-        padding: { left: 24, right: 48, top: 4, bottom: 4 }
+        padding: { left: 24, right: 35, top: 4, bottom: 4 }
       },
       scales: {
         x: {
@@ -1547,7 +1674,7 @@ function renderPurokChart() {
           grid: { display: false },
           ticks: {
             padding: 8,
-            font: { family: 'Inter, sans-serif', size: 10.5, weight: '500' },
+            font: { family: 'Inter, sans-serif', size: 10, weight: '600' },
             color: '#334155',
             autoSkip: false
           }
@@ -1581,28 +1708,45 @@ function renderExposurePieChart() {
   const { filteredPatients } = getFilteredAnalyticsContext();
   const total = filteredPatients.length;
 
-  const counts = {};
+  const CANONICAL_VECTORS = [
+    { label: 'Domestic Dog', color: '#3B0D47' },
+    { label: 'Stray Dog', color: '#7C3AED' },
+    { label: 'Domestic Cat', color: '#D97706' },
+    { label: 'Stray Cat', color: '#0D9488' }
+  ];
+
+  const counts = {
+    'Domestic Dog': 0,
+    'Stray Dog': 0,
+    'Domestic Cat': 0,
+    'Stray Cat': 0
+  };
+
   filteredPatients.forEach((p) => {
-    let a = p.animalType || 'Domestic Dog';
+    let a = String(p.animalType || 'Domestic Dog').trim();
     if (a === 'Dog') a = 'Domestic Dog';
     if (a === 'Cat') a = 'Domestic Cat';
-    counts[a] = (counts[a] || 0) + 1;
+    if (counts[a] !== undefined) {
+      counts[a] += 1;
+    } else {
+      counts['Domestic Dog'] += 1;
+    }
   });
 
-  const labels = Object.keys(counts);
+  const labels = CANONICAL_VECTORS.map((v) => v.label);
+  const rawCounts = labels.map((k) => counts[k] || 0);
   const data = labels.map((k) => (total > 0 ? Number(((counts[k] / total) * 100).toFixed(1)) : 0));
-  const rawCounts = labels.map((k) => counts[k]);
-  const colors = ['#3B0D47', '#6B21A8', '#8B5CF6', '#C084FC', '#DDD6FE', '#CBD5E1'];
+  const colors = CANONICAL_VECTORS.map((v) => v.color);
 
   const ctxExposure = canvas.getContext('2d');
   exposurePieChart = new Chart(ctxExposure, {
     type: 'doughnut',
     data: {
-      labels: labels.length ? labels : ['No Data'],
+      labels: total > 0 ? labels : ['No Data'],
       datasets: [
         {
-          data: data.length ? data : [100],
-          backgroundColor: colors.slice(0, Math.max(1, labels.length)),
+          data: total > 0 ? data : [100],
+          backgroundColor: total > 0 ? colors : ['#CBD5E1'],
           borderWidth: 2,
           borderColor: '#FFFFFF',
           hoverOffset: 6
@@ -1612,7 +1756,7 @@ function renderExposurePieChart() {
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      cutout: '68%',
+      cutout: '66%',
       plugins: {
         legend: { display: false },
         tooltip: {
@@ -1621,34 +1765,30 @@ function renderExposurePieChart() {
           }
         }
       }
-    }
+    },
+    plugins: [createDoughnutCenterPlugin(total, 'Total Cases')]
   });
 
   const legEl = document.getElementById('animalTypeLegend');
   if (legEl) {
-    if (!labels.length) {
-      legEl.innerHTML = '<div class="text-muted" style="font-size:11px;">No records found</div>';
-    } else {
-      const half = Math.ceil(labels.length / 2);
-      const col1 = labels.slice(0, half);
-      const col2 = labels.slice(half);
+    const col1 = CANONICAL_VECTORS.slice(0, 2);
+    const col2 = CANONICAL_VECTORS.slice(2, 4);
 
-      const renderCol = (items, startIdx) =>
-        `<div>` +
-        items
-          .map(
-            (lbl, i) =>
-              `<div class="legend-badge-item"><span class="legend-color-dot" style="background:${colors[startIdx + i] || '#94A3B8'}"></span> ${lbl}: ${rawCounts[startIdx + i]} (${data[startIdx + i]}%)</div>`
-          )
-          .join('') +
-        `</div>`;
+    const renderCol = (items, startIdx) =>
+      `<div>` +
+      items
+        .map(
+          (item, i) =>
+            `<div class="legend-badge-item"><span class="legend-color-dot" style="background:${item.color}"></span> ${item.label}: <strong>${rawCounts[startIdx + i]}</strong> (${data[startIdx + i]}%)</div>`
+        )
+        .join('') +
+      `</div>`;
 
-      legEl.innerHTML = renderCol(col1, 0) + renderCol(col2, half);
-    }
+    legEl.innerHTML = renderCol(col1, 0) + renderCol(col2, 2);
   }
 }
 
-// 3. Doughnut: Patient Distribution by Age group (Live Clinic Data)
+// 3. Doughnut: Patient Distribution by Age group + Sex Split Summary (Live Clinic Data)
 function renderAgeGroupChart() {
   const canvas = document.getElementById('ageGroupChart');
   if (!canvas || typeof Chart === 'undefined') return;
@@ -1661,20 +1801,25 @@ function renderAgeGroupChart() {
   const total = filteredPatients.length;
 
   let c = 0, y = 0, a = 0, s = 0;
+  let maleCount = 0, femaleCount = 0;
   filteredPatients.forEach((p) => {
     const age = Number(p.age || 0);
     if (age < 15) c += 1;
     else if (age < 25) y += 1;
     else if (age < 55) a += 1;
     else s += 1;
+
+    const sx = String(p.sex || '').trim().toLowerCase();
+    if (sx === 'male') maleCount += 1;
+    else if (sx === 'female') femaleCount += 1;
   });
 
   const groups = [
-    { label: 'Children (<15yrs)', count: c, color: '#3B0D47' },
-    { label: 'Youth (15-24yrs)', count: y, color: '#6B21A8' },
-    { label: 'Adults (25-54yrs)', count: a, color: '#8B5CF6' },
-    { label: 'Seniors (55+yrs)', count: s, color: '#C084FC' }
-  ].filter((g) => g.count > 0 || total === 0);
+    { label: 'Children (<15y)', count: c, color: '#3B0D47' },
+    { label: 'Youth (15-24y)', count: y, color: '#6B21A8' },
+    { label: 'Adults (25-54y)', count: a, color: '#8B5CF6' },
+    { label: 'Seniors (55+y)', count: s, color: '#C084FC' }
+  ];
 
   const labels = groups.map((g) => g.label);
   const data = groups.map((g) => (total > 0 ? Number(((g.count / total) * 100).toFixed(1)) : 0));
@@ -1684,11 +1829,11 @@ function renderAgeGroupChart() {
   ageGroupChart = new Chart(ctxAge, {
     type: 'doughnut',
     data: {
-      labels: labels.length ? labels : ['No Data'],
+      labels: total > 0 ? labels : ['No Data'],
       datasets: [
         {
-          data: data.length ? data : [100],
-          backgroundColor: colors.length ? colors : ['#CBD5E1'],
+          data: total > 0 ? data : [100],
+          backgroundColor: total > 0 ? colors : ['#CBD5E1'],
           borderWidth: 2,
           borderColor: '#FFFFFF',
           hoverOffset: 6
@@ -1698,7 +1843,7 @@ function renderAgeGroupChart() {
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      cutout: '68%',
+      cutout: '66%',
       plugins: {
         legend: { display: false },
         tooltip: {
@@ -1707,21 +1852,31 @@ function renderAgeGroupChart() {
           }
         }
       }
-    }
+    },
+    plugins: [createDoughnutCenterPlugin(total, 'Patients')]
   });
 
   const legEl = document.getElementById('ageGroupLegend');
   if (legEl) {
-    legEl.innerHTML = groups
+    const malePct = total > 0 ? Number(((maleCount / total) * 100).toFixed(1)) : 0;
+    const femalePct = total > 0 ? Number(((femaleCount / total) * 100).toFixed(1)) : 0;
+    const ageItemsHtml = groups
       .map(
         (g, idx) =>
-          `<div class="legend-badge-item"><span class="legend-color-dot" style="background:${g.color}"></span> ${g.label}: ${g.count} (${data[idx]}%)</div>`
+          `<div class="legend-badge-item"><span class="legend-color-dot" style="background:${g.color}"></span> ${g.label}: <strong>${g.count}</strong> (${data[idx]}%)</div>`
       )
       .join('');
+    const sexSplitHtml = `
+      <div class="legend-sex-split" style="margin-top: 4px; padding-top: 4px; border-top: 1px dashed #E2E8F0; font-size: 10px; color: #475569; display: flex; justify-content: space-between; width: 100%;">
+        <span><i class="fas fa-mars" style="color:#4F46E5; margin-right:3px;"></i>Male: <strong>${maleCount}</strong> (${malePct}%)</span>
+        <span><i class="fas fa-venus" style="color:#DB2777; margin-right:3px;"></i>Female: <strong>${femaleCount}</strong> (${femalePct}%)</span>
+      </div>
+    `;
+    legEl.innerHTML = ageItemsHtml + sexSplitHtml;
   }
 }
 
-// 4. Line Chart: Walk-In & Outcome Trend (Live Clinic Data across October 2026)
+// 4. Combo Bar + Line Chart: Walk-In & Outcome Trend (Live 2026 Clinical Surveillance)
 function renderWeeklyTrendGraph() {
   const canvas = document.getElementById('weeklyTrendGraph');
   if (!canvas || typeof Chart === 'undefined') return;
@@ -1731,103 +1886,173 @@ function renderWeeklyTrendGraph() {
   }
 
   const { filteredPatients } = getFilteredAnalyticsContext();
+  const yearEl = document.getElementById('globalFilterYear');
+  const monthEl = document.getElementById('globalFilterMonth');
+  const quarterEl = document.getElementById('globalFilterQuarter');
+  const selectedYear = yearEl ? yearEl.value : 'All';
+  const selectedMonth = monthEl ? monthEl.value : 'All';
+  const selectedQuarter = quarterEl ? quarterEl.value : 'All';
 
-  const weeks = ['Oct 1-7 (W1)', 'Oct 8-14 (W2)', 'Oct 15-21 (W3)', 'Oct 22-28 (W4)'];
-  const intakes = [0, 0, 0, 0];
-  const outcomes = [0, 0, 0, 0];
+  const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const yrLabel = selectedYear !== 'All' ? selectedYear : '2026';
 
-  filteredPatients.forEach((p) => {
-    const dt = new Date(p.day0WalkInDate || p.createdAt || '2026-10-22');
-    const day = dt.getDate();
-    if (day <= 7) intakes[0] += 1;
-    else if (day <= 14) intakes[1] += 1;
-    else if (day <= 21) intakes[2] += 1;
-    else intakes[3] += 1;
+  let labels = [];
+  let intakes = [];
+  let cat3Cases = [];
+  let outcomes = [];
 
-    (p.pepSchedule || []).forEach((s) => {
-      if (s.status === 'Fulfilled' || s.doseAdministered === true) {
-        const sDate = new Date(s.scheduledDate || dt);
-        const sDay = sDate.getDate();
-        if (sDay <= 7) outcomes[0] += 1;
-        else if (sDay <= 14) outcomes[1] += 1;
-        else if (sDay <= 21) outcomes[2] += 1;
-        else outcomes[3] += 1;
+  if (selectedMonth !== 'All') {
+    const mIdx = Math.max(0, Math.min(11, parseInt(selectedMonth, 10) - 1));
+    const mName = MONTH_NAMES[mIdx] || 'Oct';
+    labels = [`${mName} 1-7 (W1)`, `${mName} 8-14 (W2)`, `${mName} 15-21 (W3)`, `${mName} 22+ (W4)`];
+    intakes = [0, 0, 0, 0];
+    cat3Cases = [0, 0, 0, 0];
+    outcomes = [0, 0, 0, 0];
+
+    filteredPatients.forEach((p) => {
+      const dt = new Date(p.day0WalkInDate || p.createdAt || '2026-10-22');
+      const day = dt.getDate();
+      const bIdx = day <= 7 ? 0 : day <= 14 ? 1 : day <= 21 ? 2 : 3;
+      intakes[bIdx] += 1;
+      if (String(p.woundCategory || '').includes('III')) {
+        cat3Cases[bIdx] += 1;
       }
-    });
-  });
 
-  const trendCalloutPlugin = {
-    id: 'trendCalloutPlugin',
-    afterDatasetsDraw(chart) {
-      const { ctx } = chart;
-      const meta0 = chart.getDatasetMeta(0); // Intakes
-      const meta1 = chart.getDatasetMeta(1); // Outcomes
-
-      function drawCallout(x, y, text, bgColor) {
-        ctx.save();
-        ctx.font = 'bold 9.5px Inter, sans-serif';
-        const textWidth = ctx.measureText(text).width;
-        const padX = 6;
-        const w = textWidth + padX * 2;
-        const h = 15;
-        const rx = x - w / 2;
-        const ry = y - 20;
-
-        ctx.fillStyle = bgColor;
-        ctx.beginPath();
-        if (ctx.roundRect) {
-          ctx.roundRect(rx, ry, w, h, 3);
-        } else {
-          ctx.rect(rx, ry, w, h);
+      (p.pepSchedule || []).forEach((s) => {
+        if (s.status === 'Fulfilled' || s.doseAdministered === true) {
+          const sDate = new Date(s.dateProcessed || s.scheduledDate || dt);
+          if (sDate.getMonth() === mIdx) {
+            const sDay = sDate.getDate();
+            const sIdx = sDay <= 7 ? 0 : sDay <= 14 ? 1 : sDay <= 21 ? 2 : 3;
+            outcomes[sIdx] += 1;
+          }
         }
-        ctx.fill();
+      });
+    });
+  } else if (selectedQuarter !== 'All' && ['Q1', 'Q2', 'Q3', 'Q4'].includes(selectedQuarter)) {
+    const qMonthsMap = { Q1: [0, 1, 2], Q2: [3, 4, 5], Q3: [6, 7, 8], Q4: [9, 10, 11] };
+    const qMonths = qMonthsMap[selectedQuarter];
+    labels = qMonths.map((m) => `${MONTH_NAMES[m]} ${yrLabel}`);
+    intakes = [0, 0, 0];
+    cat3Cases = [0, 0, 0];
+    outcomes = [0, 0, 0];
 
-        ctx.fillStyle = '#FFFFFF';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(text, x, ry + h / 2);
-        ctx.restore();
+    filteredPatients.forEach((p) => {
+      const dt = new Date(p.day0WalkInDate || p.createdAt || '2026-10-22');
+      const bIdx = qMonths.indexOf(dt.getMonth());
+      if (bIdx !== -1) {
+        intakes[bIdx] += 1;
+        if (String(p.woundCategory || '').includes('III')) cat3Cases[bIdx] += 1;
+      }
+      (p.pepSchedule || []).forEach((s) => {
+        if (s.status === 'Fulfilled' || s.doseAdministered === true) {
+          const sDate = new Date(s.dateProcessed || s.scheduledDate || dt);
+          const sIdx = qMonths.indexOf(sDate.getMonth());
+          if (sIdx !== -1) outcomes[sIdx] += 1;
+        }
+      });
+    });
+  } else if (selectedYear !== 'All' && selectedYear !== '2026') {
+    labels = [`Q1 ${selectedYear}`, `Q2 ${selectedYear}`, `Q3 ${selectedYear}`, `Q4 ${selectedYear}`];
+    intakes = [0, 0, 0, 0];
+    cat3Cases = [0, 0, 0, 0];
+    outcomes = [0, 0, 0, 0];
+
+    filteredPatients.forEach((p) => {
+      const dt = new Date(p.day0WalkInDate || p.createdAt || '2026-10-22');
+      const bIdx = Math.min(3, Math.max(0, Math.floor(dt.getMonth() / 3)));
+      intakes[bIdx] += 1;
+      if (String(p.woundCategory || '').includes('III')) {
+        cat3Cases[bIdx] += 1;
+      }
+      (p.pepSchedule || []).forEach((s) => {
+        if (s.status === 'Fulfilled' || s.doseAdministered === true) {
+          const sDate = new Date(s.dateProcessed || s.scheduledDate || dt);
+          if (String(sDate.getFullYear()) === selectedYear) {
+            const sIdx = Math.min(3, Math.max(0, Math.floor(sDate.getMonth() / 3)));
+            outcomes[sIdx] += 1;
+          }
+        }
+      });
+    });
+  } else {
+    // Active 2026 Surveillance Window (Sep Prior + Oct W1–W4) — zero empty 0-value years
+    labels = ['Sep (Prior)', 'Oct 1-7 (W1)', 'Oct 8-14 (W2)', 'Oct 15-21 (W3)', 'Oct 22+ (W4)'];
+    intakes = [0, 0, 0, 0, 0];
+    cat3Cases = [0, 0, 0, 0, 0];
+    outcomes = [0, 0, 0, 0, 0];
+
+    const getBucketIndex = (dt) => {
+      const m = dt.getMonth();
+      const day = dt.getDate();
+      if (m < 9) return 0; // September or earlier active cohort
+      if (m > 9) return 4; // Late-quarter cohort
+      if (day <= 7) return 1;
+      if (day <= 14) return 2;
+      if (day <= 21) return 3;
+      return 4;
+    };
+
+    filteredPatients.forEach((p) => {
+      const dt = new Date(p.day0WalkInDate || p.createdAt || '2026-10-22');
+      const bIdx = getBucketIndex(dt);
+      intakes[bIdx] += 1;
+      if (String(p.woundCategory || '').includes('III')) {
+        cat3Cases[bIdx] += 1;
       }
 
-      // Draw callout pins on Peak Week 4
-      if (meta0 && meta0.data && meta0.data[3] && intakes[3] > 0) {
-        drawCallout(meta0.data[3].x, meta0.data[3].y, `${intakes[3]} Intakes`, '#3B0D47');
-      }
-      if (meta1 && meta1.data && meta1.data[3] && outcomes[3] > 0) {
-        drawCallout(meta1.data[3].x, meta1.data[3].y, `${outcomes[3]} Doses`, '#7C3AED');
-      }
-    }
-  };
+      (p.pepSchedule || []).forEach((s) => {
+        if (s.status === 'Fulfilled' || s.doseAdministered === true) {
+          const sDate = new Date(s.dateProcessed || s.scheduledDate || dt);
+          const sIdx = getBucketIndex(sDate);
+          outcomes[sIdx] += 1;
+        }
+      });
+    });
+  }
 
-  const maxVal = Math.max(...intakes, ...outcomes, 5);
+  const maxVal = Math.max(...intakes, ...cat3Cases, ...outcomes, 5);
 
   const ctxTrend = canvas.getContext('2d');
   weeklyTrendChart = new Chart(ctxTrend, {
-    type: 'line',
+    type: 'bar',
     data: {
-      labels: weeks,
+      labels: labels,
       datasets: [
         {
-          label: 'Patient Intakes',
+          type: 'bar',
+          label: 'Walk-In Intakes',
           data: intakes,
-          borderColor: '#3B0D47',
-          backgroundColor: 'transparent',
-          borderWidth: 2.5,
-          tension: 0.35,
-          pointBackgroundColor: '#3B0D47',
-          pointRadius: 4,
-          pointHoverRadius: 6
+          backgroundColor: '#3B0D47',
+          borderRadius: 4,
+          barPercentage: 0.72,
+          categoryPercentage: 0.68,
+          order: 2
         },
         {
+          type: 'bar',
+          label: 'Category III Severe',
+          data: cat3Cases,
+          backgroundColor: '#DC2626',
+          borderRadius: 4,
+          barPercentage: 0.72,
+          categoryPercentage: 0.68,
+          order: 3
+        },
+        {
+          type: 'line',
           label: 'Doses Administered',
           data: outcomes,
-          borderColor: '#C084FC',
-          backgroundColor: 'transparent',
+          borderColor: '#7C3AED',
+          backgroundColor: 'rgba(124, 58, 237, 0.12)',
           borderWidth: 2.5,
           tension: 0.35,
-          pointBackgroundColor: '#C084FC',
+          pointBackgroundColor: '#7C3AED',
+          pointBorderColor: '#FFFFFF',
+          pointBorderWidth: 1.5,
           pointRadius: 4,
-          pointHoverRadius: 6
+          pointHoverRadius: 6,
+          order: 1
         }
       ]
     },
@@ -1835,13 +2060,13 @@ function renderWeeklyTrendGraph() {
       responsive: true,
       maintainAspectRatio: false,
       layout: {
-        padding: { top: 22, bottom: 4, left: 10, right: 10 }
+        padding: { top: 14, bottom: 4, left: 8, right: 10 }
       },
       scales: {
         x: {
           grid: { display: false },
           ticks: {
-            font: { family: 'Inter, sans-serif', size: 10 },
+            font: { family: 'Inter, sans-serif', size: 9.5, weight: '500' },
             color: '#475569'
           }
         },
@@ -1862,12 +2087,11 @@ function renderWeeklyTrendGraph() {
         legend: { display: false },
         tooltip: {
           callbacks: {
-            label: (ctx) => ` ${ctx.dataset.label}: ${Number(ctx.raw).toLocaleString()} cases`
+            label: (ctx) => ` ${ctx.dataset.label}: ${Number(ctx.raw).toLocaleString()}`
           }
         }
       }
-    },
-    plugins: [trendCalloutPlugin]
+    }
   });
 
   const yoyRow = document.getElementById('trendYoYRow');
@@ -1880,16 +2104,15 @@ function renderWeeklyTrendGraph() {
       const sign = pct > 0 ? '+' : '';
       return `<span class="yoy-pill ${cls}">${sign}${pct}%</span>`;
     };
-    yoyRow.innerHTML = `
-      <span class="yoy-pill" style="opacity:0">0%</span>
-      ${calcPill(intakes[1] || 0, intakes[0] || 0)}
-      ${calcPill(intakes[2] || 0, intakes[1] || 0)}
-      ${calcPill(intakes[3] || 0, intakes[2] || 0)}
-    `;
+    const pills = ['<span class="yoy-pill" style="opacity:0.55">Baseline</span>'];
+    for (let i = 1; i < intakes.length; i++) {
+      pills.push(calcPill(intakes[i] || 0, intakes[i - 1] || 0));
+    }
+    yoyRow.innerHTML = pills.join('');
   }
 }
 
-// 5. Horizontal Bar: Intake Volume by Bite Severity (Live Clinic Data)
+// 5. Horizontal Bar: Intake Volume by Bite Severity (WHO Categories III, II, I, Pending)
 function renderBiteSeverityChart() {
   const canvas = document.getElementById('biteSeverityChart');
   if (!canvas || typeof Chart === 'undefined') return;
@@ -1915,29 +2138,28 @@ function renderBiteSeverityChart() {
     else counts['Pending Physician Assessment'] += 1;
   });
 
-  const DISPLAY_LABELS = {
-    'Category III - High Risk': ['Category III', '(High Risk)'],
-    'Category II - Moderate Risk': ['Category II', '(Moderate)'],
-    'Category I - Low Risk': ['Category I', '(Low Risk)'],
-    'Pending Physician Assessment': ['Pending', 'Assessment']
-  };
+  const SEVERITY_CONFIG = [
+    { key: 'Category III - High Risk', label: ['Category III', '(High Risk)'], color: '#BE123C' },
+    { key: 'Category II - Moderate Risk', label: ['Category II', '(Moderate)'], color: '#7C3AED' },
+    { key: 'Category I - Low Risk', label: ['Category I', '(Low Risk)'], color: '#0D9488' },
+    { key: 'Pending Physician Assessment', label: ['Pending', 'Assessment'], color: '#D97706' }
+  ];
 
-  const activeEntries = Object.entries(counts).filter(([_, count]) => count > 0);
-  const fullTitles = activeEntries.map(([lbl]) => lbl);
-  const labels = activeEntries.map(([lbl]) => DISPLAY_LABELS[lbl] || lbl);
-  const data = activeEntries.map(([_, count]) => count);
-  const colors = ['#3B0D47', '#6B21A8', '#8B5CF6', '#94A3B8'];
+  const fullTitles = SEVERITY_CONFIG.map((c) => c.key);
+  const labels = SEVERITY_CONFIG.map((c) => c.label);
+  const data = SEVERITY_CONFIG.map((c) => counts[c.key] || 0);
+  const colors = SEVERITY_CONFIG.map((c) => c.color);
 
   const ctxSeverity = canvas.getContext('2d');
   biteSeverityChart = new Chart(ctxSeverity, {
     type: 'bar',
     data: {
-      labels: labels.length ? labels : ['No Data'],
+      labels: labels,
       datasets: [
         {
           label: 'Cases',
-          data: data.length ? data : [0],
-          backgroundColor: colors.slice(0, labels.length),
+          data: data,
+          backgroundColor: colors,
           borderRadius: 3,
           barThickness: 14
         }
@@ -1948,7 +2170,7 @@ function renderBiteSeverityChart() {
       responsive: true,
       maintainAspectRatio: false,
       layout: {
-        padding: { left: 16, right: 36, top: 4, bottom: 4 }
+        padding: { left: 24, right: 35, top: 4, bottom: 4 }
       },
       scales: {
         x: {
@@ -1982,7 +2204,7 @@ function renderBiteSeverityChart() {
   });
 }
 
-// 6. Heatmap Matrix: Seasonal & Daily Intake Patterns (Live Clinic Days)
+// 6. Heatmap Matrix: Seasonal & Daily Intake Patterns (12-Month x 7-Day Surveillance Matrix)
 function renderSeasonalHeatmap() {
   const table = document.getElementById('seasonalHeatmapGrid');
   if (!table) return;
@@ -2003,13 +2225,16 @@ function renderSeasonalHeatmap() {
   };
 
   const dayMap = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  let maxCell = 1;
 
   filteredPatients.forEach((p) => {
     const dt = new Date(p.day0WalkInDate || p.createdAt || '2026-10-22');
+    if (isNaN(dt.getTime())) return;
     const dName = dayMap[dt.getDay()];
     const mIdx = dt.getMonth();
     if (matrix[dName] && mIdx >= 0 && mIdx < 12) {
       matrix[dName][mIdx] += 1;
+      if (matrix[dName][mIdx] > maxCell) maxCell = matrix[dName][mIdx];
     }
   });
 
@@ -2023,10 +2248,13 @@ function renderSeasonalHeatmap() {
     html += `<tr><td class="heatmap-day-label">${d}</td>`;
     const row = matrix[d] || [];
     row.forEach((val, colIdx) => {
-      const alpha = val === 0 ? '0.04' : (0.25 + Math.min(0.70, (val / 14) * 0.70)).toFixed(2);
-      const bg = `rgba(59, 13, 71, ${alpha})`;
+      const ratio = val > 0 ? val / Math.max(4, maxCell) : 0;
+      const alphaNum = val === 0 ? 0.04 : Number((0.22 + Math.min(0.73, ratio * 0.73)).toFixed(2));
+      const bg = `rgba(59, 13, 71, ${alphaNum})`;
+      const textColor = val === 0 ? '#94A3B8' : alphaNum >= 0.5 ? '#FFFFFF' : '#1E293B';
+      const fontWeight = val > 0 ? '700' : '400';
       const monthName = months[colIdx];
-      html += `<td style="background-color: ${bg};" title="${d}, ${monthName}: ${val} patients">${val}</td>`;
+      html += `<td style="background-color: ${bg}; color: ${textColor}; font-weight: ${fontWeight};" title="${d}, ${monthName}: ${val} walk-in case${val === 1 ? '' : 's'}">${val}</td>`;
     });
     html += '</tr>';
   });
@@ -2244,7 +2472,7 @@ function renderMasterDashboard() {
       .reduce((acc, i) => acc + Number(i.currentStock || 0), 0);
 
   // Live actionable metrics from /api/dashboard/summary take precedence when unfiltered.
-  const live = isFiltered ? null : clinicAppState.dashboardSummary;
+  const live = isFiltered ? null : normalizeSummaryData(clinicAppState.dashboardSummary);
   const dueToday = live ? live.patientsDueToday : countDueToday(patients);
   const missed = live ? live.missedOverdueDoses : countMissedOverdue(patients);
   const surge = live ? live.highSurgePuroks : countHighSurgePuroks(patients);
@@ -2938,7 +3166,7 @@ function openEditPatientModal(patient) {
   nameInput.value = patient.fullName || '';
   phoneInput.value = patient.contactNumber || '';
 
-  const patientPurok = patient.purok || patient.barangay || 'Purok 1, Kapitan Pepe';
+  const patientPurok = normalizePurokName(patient.purok || patient.barangay || 'Purok 1 (Centro)');
   let matched = false;
   for (let i = 0; i < purokSelect.options.length; i++) {
     if (purokSelect.options[i].value === patientPurok) {
@@ -3374,7 +3602,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const ageVal = Number(document.getElementById('regAge').value);
     const rawPhone = document.getElementById('mobileNumber').value.trim();
     const digitsOnly = rawPhone.replace(/\D/g, '');
-    const purokVal = document.getElementById('regBarangay').value;
+    const purokVal = normalizePurokName(document.getElementById('regBarangay').value);
     const biteInput = document.getElementById('biteDate');
     const biteDateVal = biteInput ? biteInput.value : todayDateIso;
     const payload = {
@@ -3383,7 +3611,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       sex: document.getElementById('regSex').value,
       contactNumber: digitsOnly,
       purok: purokVal,
-      barangay: purokVal,
+      barangay: 'Brgy. Kapitan Pepe',
       day0WalkInDate: biteDateVal,
       animalType: document.getElementById('regAnimalType').value,
       biteSite: document.getElementById('regBiteSite').value.trim(),
@@ -3641,7 +3869,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const patientId = document.getElementById('editPatientId').value;
       const fullName = document.getElementById('editPatientName').value.trim();
       const rawPhone = document.getElementById('editPatientPhone').value.trim();
-      const purok = document.getElementById('editPatientPurok').value.trim();
+      const purok = normalizePurokName(document.getElementById('editPatientPurok').value.trim());
 
       const digitsOnly = rawPhone.replace(/\D/g, '');
       if (!/^09\d{9}$/.test(digitsOnly)) {
@@ -4345,60 +4573,60 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Clinical info modal triggers (? button)
   const CLINICAL_HELP_TOPICS = {
     animal: {
-      title: 'Bite Distribution by Animal Type',
+      title: 'Bite Vector Distribution (Canine & Feline)',
       html: `
         <div style="text-align: left; font-size: 13px; line-height: 1.5; color: #334155;">
-          <p><strong>Clinical Significance:</strong> Feline (47.52%) and Canine (32.12%) species represent the overwhelming majority of rabies exposures in Cabanatuan City.</p>
-          <p><strong>WHO Protocol:</strong> Any warm-blooded mammalian exposure in an endemic rabies zone requires immediate categorization and initiation of post-exposure prophylaxis unless the animal is quarantined for 14 days under veterinary observation.</p>
+          <p><strong>Clinical Surveillance:</strong> Tracks live patient exposures across the four permitted WHO mammalian bite vectors: Stray Dog, Domestic Dog, Stray Cat, and Domestic Cat.</p>
+          <p><strong>WHO Protocol:</strong> Any warm-blooded mammalian exposure in an endemic rabies zone requires immediate categorization and initiation of post-exposure prophylaxis unless the animal completes a 14-day veterinary observation period.</p>
         </div>
       `
     },
     age: {
-      title: 'Patient Distribution by Age Group',
+      title: 'Patient Demographics (Age & Sex Split)',
       html: `
         <div style="text-align: left; font-size: 13px; line-height: 1.5; color: #334155;">
-          <p><strong>Demographic Profile:</strong> Children (&lt;15 yrs) constitute 42.93% of bite presentations due to behavioral interaction with stray and domestic animals.</p>
+          <p><strong>Demographic Profile:</strong> Stratifies active registry patients into Children (&lt;15y), Youth (15–24y), Adults (25–54y), and Seniors (55+y) alongside the Male/Female sex split.</p>
           <p><strong>Pediatric Dosing:</strong> Pediatric patients receive the standard 0.1 mL intradermal 2-site ID regimen on Days 0, 3, and 7 without dose reduction.</p>
         </div>
       `
     },
     trend: {
-      title: 'Walk-In & Outcome Trend Analysis',
+      title: 'Walk-In & Outcome Trend (2026 Surveillance)',
       html: `
         <div style="text-align: left; font-size: 13px; line-height: 1.5; color: #334155;">
-          <p><strong>Registry Growth:</strong> Annual comparison of walk-in intake volume versus fully documented treatment completions from 2017 to 2025.</p>
-          <p><strong>Key Milestones:</strong> Record surge reached in 2017 (7,277 intakes) with steady recovery to 4,495 completed courses by 2021.</p>
+          <p><strong>Active Surveillance Window:</strong> Compares walk-in intake volume and Category III high-risk presentations against fulfilled PEP dose milestones across the active 2026 clinical cohort.</p>
+          <p><strong>Interactive Filtering:</strong> Use the Year, Quarter, and Month controls to drill into weekly or monthly cohort velocity.</p>
         </div>
       `
     },
     purok: {
-      title: 'Intake Volume by Top 5 Purok Locations',
+      title: 'Geographic Incidence by Purok (Brgy. Kapitan Pepe)',
       html: `
         <div style="text-align: left; font-size: 13px; line-height: 1.5; color: #334155;">
-          <p><strong>Geographic Hotspots:</strong> Purok 1 Kapitan Pepe accounts for the highest density of reported incidents (36,771 cumulative exposures), followed by Purok 6 (8,145) and Purok 5 (8,144).</p>
-          <p><strong>Public Health Action:</strong> High-surge puroks are prioritized for barangay-level canine rabies vaccination drives.</p>
+          <p><strong>Geographic Hotspots:</strong> Ranks canonical Purok zones in Barangay Kapitan Pepe (Purok 1 Centro through Purok 7 Narra St.) by active bite exposure volume.</p>
+          <p><strong>Public Health Action:</strong> Puroks exceeding the barangay mean incidence are flagged as high-surge zones for targeted canine vaccination drives.</p>
         </div>
       `
     },
     severity: {
-      title: 'Intake Volume by Bite Severity',
+      title: 'WHO Wound Severity Breakdown',
       html: `
         <div style="text-align: left; font-size: 13px; line-height: 1.5; color: #334155;">
-          <p><strong>WHO Classification:</strong></p>
+          <p><strong>WHO &amp; DOH Classification:</strong></p>
           <ul style="padding-left: 20px; margin: 6px 0;">
-            <li><strong>Category III (23,903):</strong> Transdermal bites/scratches, contamination of mucous membranes. Mandates full PEP + ERIG.</li>
-            <li><strong>Category II (11,909):</strong> Minor scratches or abrasions without bleeding. Requires full PEP vaccine course.</li>
-            <li><strong>Category I (7,639):</strong> Touching/feeding animals, licks on intact skin. Wound cleansing only.</li>
+            <li><strong>Category III (Severe / ERIG):</strong> Transdermal bites/scratches or mucous membrane contamination. Mandates active PEP + ERIG infiltration.</li>
+            <li><strong>Category II (Moderate / PEP):</strong> Minor scratches or abrasions without bleeding. Requires active anti-rabies PEP course.</li>
+            <li><strong>Category I (Intact / Wash):</strong> Touching/feeding animals or licks on intact skin. Wound cleansing only.</li>
           </ul>
         </div>
       `
     },
     outcomes: {
-      title: 'Most Common Treatment Outcomes',
+      title: 'PEP Regimen Milestone Funnel (Day 0 to Day 28)',
       html: `
         <div style="text-align: left; font-size: 13px; line-height: 1.5; color: #334155;">
-          <p><strong>Regimen Compliance:</strong> 12,233 patients successfully completed all scheduled vaccine milestones.</p>
-          <p><strong>Defaulter Tracking:</strong> Defaulters (9,559) trigger automated follow-up reminders to minimize dropout before Day 7/28 immunity is established.</p>
+          <p><strong>Milestone Retention:</strong> Tracks patient progression from Day 0 intake through Day 3, Day 7, Day 14, and Day 28 completion.</p>
+          <p><strong>Defaulter Prevention:</strong> Any drop-off between Day 0 and Day 7 is surfaced in the Overdue &amp; Missed Doses Watchlist for immediate SMS/call follow-up.</p>
         </div>
       `
     }

@@ -115,7 +115,20 @@ const registerWalkInPatient = async (req, res) => {
       });
     }
 
-    const resolvedAddress = (purok || barangay || 'Purok 1, Kapitan Pepe').trim();
+    const CANONICAL_PUROK_MAP = {
+      '1': 'Purok 1 (Centro)',
+      '2': 'Purok 2 (Mabini Ext.)',
+      '3': 'Purok 3 (Rizal St.)',
+      '4': 'Purok 4 (Del Pilar)',
+      '5': 'Purok 5 (Maharlika)',
+      '6': 'Purok 6 (Riverbank)',
+      '7': 'Purok 7 (Narra St.)'
+    };
+    const rawAddr = String(purok || barangay || 'Purok 1 (Centro)').trim();
+    const pMatch = rawAddr.match(/purok\s*([1-7])\b/i);
+    const resolvedAddress = (pMatch && CANONICAL_PUROK_MAP[pMatch[1]])
+      ? CANONICAL_PUROK_MAP[pMatch[1]]
+      : (rawAddr.split(',')[0].trim() || 'Purok 1 (Centro)');
     const resolvedBiteStatus = (biteStatus || 'Bite - Unprovoked').trim();
     const walkInDateObj = day0WalkInDate ? new Date(day0WalkInDate) : new Date();
 
@@ -144,7 +157,7 @@ const registerWalkInPatient = async (req, res) => {
       sex,
       contactNumber: normalizedPhone,
       purok: resolvedAddress,
-      barangay: resolvedAddress,
+      barangay: 'Brgy. Kapitan Pepe',
       consentGiven: true,
       day0WalkInDate: walkInDateObj,
       animalType: resolvedAnimal,

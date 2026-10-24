@@ -579,9 +579,7 @@ const updatePatientDemographics = async (req, res) => {
       });
     }
 
-    const cleanPurok = (purok && typeof purok === 'string' && purok.trim())
-      ? purok.trim()
-      : 'Purok 1, Kapitan Pepe';
+    const cleanPurok = normalizePurokName(purok);
 
     const patient = await Patient.findOne({
       $or: [
@@ -601,7 +599,7 @@ const updatePatientDemographics = async (req, res) => {
     patient.fullName = fullName.trim();
     patient.contactNumber = cleanPhone;
     patient.purok = cleanPurok;
-    patient.barangay = cleanPurok;
+    patient.barangay = 'Brgy. Kapitan Pepe';
 
     await patient.save();
 
@@ -642,6 +640,26 @@ const updatePatientDemographics = async (req, res) => {
   }
 };
 
+const CANONICAL_PUROK_MAP = {
+  '1': 'Purok 1 (Centro)',
+  '2': 'Purok 2 (Mabini Ext.)',
+  '3': 'Purok 3 (Rizal St.)',
+  '4': 'Purok 4 (Del Pilar)',
+  '5': 'Purok 5 (Maharlika)',
+  '6': 'Purok 6 (Riverbank)',
+  '7': 'Purok 7 (Narra St.)'
+};
+
+function normalizePurokName(rawPurok) {
+  const str = String(rawPurok || '').trim();
+  if (!str) return 'Purok 1 (Centro)';
+  const match = str.match(/purok\s*([1-7])\b/i);
+  if (match && CANONICAL_PUROK_MAP[match[1]]) {
+    return CANONICAL_PUROK_MAP[match[1]];
+  }
+  return str.split(',')[0].trim() || 'Purok 1 (Centro)';
+}
+
 // Actionable KPI metrics for the Clinic Overview (Dual-Path: MongoDB aggregations with seamless In-Memory fallback).
 const getDashboardSummary = async (req, res) => {
   try {
@@ -662,6 +680,28 @@ const getDashboardSummary = async (req, res) => {
     // ------------------------------------------------------------------------
     if (isConnected) {
       try {
+        // Normalize any non-canonical Purok strings directly in live MongoDB records
+        const canonicalPurokValues = Object.values(CANONICAL_PUROK_MAP);
+        const legacyDocs = await Patient.find({
+          $or: [
+            { purok: { $nin: canonicalPurokValues } },
+            { barangay: /D\.S\.\s*Garcia/i }
+          ]
+        })
+          .select('_id purok barangay')
+          .lean();
+        if (legacyDocs && legacyDocs.length > 0) {
+          await Promise.all(
+            legacyDocs.map((doc) => {
+              const canon = normalizePurokName(doc.purok || doc.barangay);
+              return Patient.updateOne(
+                { _id: doc._id },
+                { $set: { purok: canon, barangay: 'Brgy. Kapitan Pepe' } }
+              );
+            })
+          );
+        }
+
         const [
           activePatientsCount,
           dueTodayAgg,
@@ -708,6 +748,7 @@ const getDashboardSummary = async (req, res) => {
 
           // 3. Triage Queue (Waiting for Doctor, FIFO)
           Patient.find({
+            clinicalStatus: { $nin: ['Completed', 'Wound Cleansing Only'] },
             $or: [
               { woundCategory: 'Pending' },
               { clinicalStatus: { $in: ['Waiting for Doctor', 'Needs Triage'] } }
@@ -719,6 +760,7 @@ const getDashboardSummary = async (req, res) => {
 
           // 4. Defaulters / Overdue Patients
           Patient.find({
+            clinicalStatus: { $nin: ['Completed', 'Wound Cleansing Only'] },
             $or: [
               { clinicalStatus: 'Missed Dose' },
               { 'pepSchedule.status': 'Defaulter' },
@@ -842,20 +884,30 @@ const getDashboardSummary = async (req, res) => {
         }
         const patientsDueToday = Object.values(dueTodayBreakdown).reduce((a, b) => a + b, 0);
 
-        // --- Format Triage Queue ---
-        const triageQueue = (triageDocs || []).map((p) => ({
-          id: p.patientId,
-          name: p.fullName,
-          animalType: p.animalType || 'Domestic Dog',
-          purok: p.purok || p.barangay || 'Purok 1, Kapitan Pepe',
-          arrivalTime: p.createdAt
-            ? new Date(p.createdAt).toISOString()
-            : (p.day0WalkInDate ? new Date(p.day0WalkInDate).toISOString() : new Date().toISOString())
-        }));
+        // --- Format Triage Queue (Deduplicated by patientId) ---
+        const seenTriageIds = new Set();
+        const triageQueue = [];
+        for (const p of triageDocs || []) {
+          const pid = p.patientId || String(p._id);
+          if (seenTriageIds.has(pid)) continue;
+          seenTriageIds.add(pid);
+          triageQueue.push({
+            id: pid,
+            name: p.fullName,
+            animalType: p.animalType || 'Domestic Dog',
+            purok: normalizePurokName(p.purok || p.barangay || 'Purok 1 (Centro)'),
+            arrivalTime: p.createdAt
+              ? new Date(p.createdAt).toISOString()
+              : (p.day0WalkInDate ? new Date(p.day0WalkInDate).toISOString() : new Date().toISOString())
+          });
+        }
 
-        // --- Format Defaulters List ---
+        // --- Format Defaulters List (Deduplicated by patientId) ---
+        const seenDefaulterIds = new Set();
         const defaulters = [];
         for (const p of overdueDocs || []) {
+          const pid = p.patientId || String(p._id);
+          if (seenDefaulterIds.has(pid)) continue;
           const missedList = (p.pepSchedule || []).filter((d) => {
             if (d.status === 'Defaulter') return true;
             if (d.status === 'Pending') {
@@ -873,8 +925,9 @@ const getDashboardSummary = async (req, res) => {
             const diffTime = todayStart.getTime() - doseDate.getTime();
             const daysOverdue = Math.max(1, Math.floor(diffTime / (24 * 60 * 60 * 1000)));
 
+            seenDefaulterIds.add(pid);
             defaulters.push({
-              id: p.patientId,
+              id: pid,
               name: p.fullName,
               phone: p.contactNumber || 'N/A',
               missedDose: targetDose.doseDay,
@@ -882,8 +935,9 @@ const getDashboardSummary = async (req, res) => {
               daysOverdue
             });
           } else if (p.clinicalStatus === 'Missed Dose') {
+            seenDefaulterIds.add(pid);
             defaulters.push({
-              id: p.patientId,
+              id: pid,
               name: p.fullName,
               phone: p.contactNumber || 'N/A',
               missedDose: 'Booster Dose',
@@ -964,15 +1018,15 @@ const getDashboardSummary = async (req, res) => {
           erig: buildVialHealth('ERIG', 10, 0.8)
         };
 
-        // --- Format Surveillance Maps ---
+        // --- Format Surveillance Maps (Normalized Canonical Puroks) ---
         const purokOutbreaks = {};
-        const purokCounts = [];
         for (const p of purokAgg || []) {
           if (p._id) {
-            purokOutbreaks[p._id] = Number(p.count || 0);
-            purokCounts.push(Number(p.count || 0));
+            const canonPurok = normalizePurokName(p._id);
+            purokOutbreaks[canonPurok] = (purokOutbreaks[canonPurok] || 0) + Number(p.count || 0);
           }
         }
+        const purokCounts = Object.values(purokOutbreaks);
         const meanPurok = purokCounts.length ? purokCounts.reduce((a, b) => a + b, 0) / purokCounts.length : 0;
         const highSurgePuroks = purokCounts.filter((c) => c > meanPurok).length;
 
@@ -1085,21 +1139,33 @@ const getDashboardSummary = async (req, res) => {
     });
     const patientsDueToday = distinctDueSet.size;
 
-    // 3. Triage Queue (Waiting for Doctor, FIFO)
+    // 3. Triage Queue (Waiting for Doctor, FIFO, Deduplicated)
+    const seenTriageFallback = new Set();
     const triageQueue = patients
-      .filter((p) => p.woundCategory === 'Pending' || ['Waiting for Doctor', 'Needs Triage'].includes(p.clinicalStatus))
+      .filter((p) => !['Completed', 'Wound Cleansing Only'].includes(p.clinicalStatus) && (p.woundCategory === 'Pending' || ['Waiting for Doctor', 'Needs Triage'].includes(p.clinicalStatus)))
       .sort((a, b) => new Date(a.createdAt || a.day0WalkInDate || Date.now()) - new Date(b.createdAt || b.day0WalkInDate || Date.now()))
-      .map((p) => ({
-        id: p.patientId,
-        name: p.fullName,
-        animalType: p.animalType || 'Domestic Dog',
-        purok: p.purok || p.barangay || 'Purok 1, Kapitan Pepe',
-        arrivalTime: (p.createdAt ? new Date(p.createdAt) : new Date(p.day0WalkInDate || Date.now())).toISOString()
-      }));
+      .reduce((acc, p) => {
+        const pid = p.patientId || String(p._id);
+        if (!seenTriageFallback.has(pid)) {
+          seenTriageFallback.add(pid);
+          acc.push({
+            id: pid,
+            name: p.fullName,
+            animalType: p.animalType || 'Domestic Dog',
+            purok: normalizePurokName(p.purok || p.barangay || 'Purok 1 (Centro)'),
+            arrivalTime: (p.createdAt ? new Date(p.createdAt) : new Date(p.day0WalkInDate || Date.now())).toISOString()
+          });
+        }
+        return acc;
+      }, []);
 
-    // 4. Defaulters / Overdue Patients (sorted by daysOverdue descending)
+    // 4. Defaulters / Overdue Patients (sorted by daysOverdue descending, Deduplicated)
+    const seenDefaultersFallback = new Set();
     const defaulters = [];
     patients.forEach((p) => {
+      if (['Completed', 'Wound Cleansing Only'].includes(p.clinicalStatus)) return;
+      const pid = p.patientId || String(p._id);
+      if (seenDefaultersFallback.has(pid)) return;
       const missedList = (p.pepSchedule || []).filter((d) => {
         if (d.status === 'Defaulter') return true;
         if (d.status === 'Pending') {
@@ -1114,8 +1180,9 @@ const getDashboardSummary = async (req, res) => {
         const target = missedList[0];
         const doseDate = new Date(target.scheduledDate);
         const daysOverdue = Math.max(1, Math.floor((todayStart.getTime() - doseDate.getTime()) / (24 * 60 * 60 * 1000)));
+        seenDefaultersFallback.add(pid);
         defaulters.push({
-          id: p.patientId,
+          id: pid,
           name: p.fullName,
           phone: p.contactNumber || 'N/A',
           missedDose: target.doseDay,
@@ -1123,8 +1190,9 @@ const getDashboardSummary = async (req, res) => {
           daysOverdue
         });
       } else if (p.clinicalStatus === 'Missed Dose') {
+        seenDefaultersFallback.add(pid);
         defaulters.push({
-          id: p.patientId,
+          id: pid,
           name: p.fullName,
           phone: p.contactNumber || 'N/A',
           missedDose: 'Booster Dose',
@@ -1220,10 +1288,10 @@ const getDashboardSummary = async (req, res) => {
       erig: buildVialHealth('ERIG', 10, 0.8)
     };
 
-    // 8. Surveillance Maps
+    // 8. Surveillance Maps (Normalized Canonical Puroks)
     const purokOutbreaks = {};
     patients.forEach((p) => {
-      const pk = p.purok || p.barangay || 'Purok 1, Kapitan Pepe';
+      const pk = normalizePurokName(p.purok || p.barangay || 'Purok 1 (Centro)');
       purokOutbreaks[pk] = (purokOutbreaks[pk] || 0) + 1;
     });
     const pCounts = Object.values(purokOutbreaks);

@@ -372,13 +372,13 @@
                 <div class="form-group">
                   <label for="regBarangay">Purok in Barangay Kapitan Pepe *</label>
                   <select id="regBarangay" required>
-                    <option value="Purok 1, Kapitan Pepe">Purok 1, Kapitan Pepe</option>
-                    <option value="Purok 2, Kapitan Pepe">Purok 2, Kapitan Pepe</option>
-                    <option value="Purok 3, Kapitan Pepe">Purok 3, Kapitan Pepe</option>
-                    <option value="Purok 4, Kapitan Pepe">Purok 4, Kapitan Pepe</option>
-                    <option value="Purok 5, Kapitan Pepe">Purok 5, Kapitan Pepe</option>
-                    <option value="Purok 6, Kapitan Pepe">Purok 6, Kapitan Pepe</option>
-                    <option value="Purok 7, Kapitan Pepe">Purok 7, Kapitan Pepe</option>
+                    <option value="Purok 1 (Centro)">Purok 1 (Centro)</option>
+                    <option value="Purok 2 (Mabini Ext.)">Purok 2 (Mabini Ext.)</option>
+                    <option value="Purok 3 (Rizal St.)">Purok 3 (Rizal St.)</option>
+                    <option value="Purok 4 (Del Pilar)">Purok 4 (Del Pilar)</option>
+                    <option value="Purok 5 (Maharlika)">Purok 5 (Maharlika)</option>
+                    <option value="Purok 6 (Riverbank)">Purok 6 (Riverbank)</option>
+                    <option value="Purok 7 (Narra St.)">Purok 7 (Narra St.)</option>
                   </select>
                 </div>
                 <div class="form-group">
@@ -698,60 +698,6 @@
             </div>
           </div>
 
-          <!-- Clinical Restock & FEFO Expiration Alert Group -->
-          <div id="adminStockAlertsContainer" class="admin-alerts-container">
-            <!-- 1. Critical Restock Warning Banner -->
-            <div id="adminStockAlertsBanner" class="clinic-alert-banner banner-danger hidden" role="alert">
-              <div class="alert-icon-col">
-                <i class="fas fa-exclamation-triangle alert-icon-pulse" aria-hidden="true"></i>
-              </div>
-              <div class="alert-content-col">
-                <div class="alert-title-row">
-                  <strong class="alert-title">CRITICAL VACCINE RESTOCK REQUIRED</strong>
-                  <span class="badge badge-red badge-sm" id="adminStockAlertCountBadge">1 Biologic Depleted</span>
-                </div>
-                <div class="alert-message" id="adminStockAlertMessage">
-                  <!-- Dynamically rendered -->
-                </div>
-                <div class="alert-actions-row">
-                  <button
-                    type="button"
-                    class="btn btn-sm btn-danger alert-action-btn"
-                    id="adminBannerRestockBtn"
-                    data-jump-nav="viewAdminInventory"
-                    data-focus-input="invBrandName"
-                  >
-                    <i class="fas fa-truck-loading" aria-hidden="true"></i> Restock Depleted Biologics
-                  </button>
-                  <button type="button" class="btn btn-sm btn-outline-danger alert-action-btn" data-jump-nav="viewAdminInventory">
-                    Inspect Batch Inventory
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <!-- 2. Proactive FEFO Expiration Warning Banner (30–60 Days) -->
-            <div id="adminFefoAlertBanner" class="clinic-alert-banner banner-warning hidden" role="alert">
-              <div class="alert-icon-col">
-                <i class="fas fa-hourglass-half text-amber" aria-hidden="true"></i>
-              </div>
-              <div class="alert-content-col">
-                <div class="alert-title-row">
-                  <strong class="alert-title">PROACTIVE FEFO EXPIRY WARNING (30–60 DAYS)</strong>
-                  <span class="badge badge-amber badge-sm" id="adminFefoAlertCountBadge">1 Batch Approaching Expiry</span>
-                </div>
-                <div class="alert-message" id="adminFefoAlertMessage">
-                  <!-- Dynamically rendered -->
-                </div>
-                <div class="alert-actions-row">
-                  <button type="button" class="btn btn-sm btn-outline-warning alert-action-btn" data-jump-nav="viewAdminInventory">
-                    <i class="fas fa-boxes" aria-hidden="true"></i> Prioritize FEFO Dispensing
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
           <!-- Row 1: Executive KPIs -->
           <div class="kpi-grid superadmin-cards-wrapper">
             <!-- 1. SuperAdmin Workspace navigation panel -->
@@ -777,13 +723,14 @@
               </div>
               <div class="kpi-content-split">
                 <strong class="kpi-value tabular-num" id="adminKpiDueToday">0</strong>
-                <div class="kpi-milestone-pills" id="adminDueMilestoneBreakdown" title="Breakdown by dose milestone">
-                  <span class="kpi-milestone-pill" id="adminDueDay0Pill" title="Day 0 (Initial Walk-in)">d0:<strong id="adminDueDay0">0</strong></span>
-                  <span class="kpi-milestone-pill" id="adminDueDay3Pill" title="Day 3 Booster">d3:<strong id="adminDueDay3">0</strong></span>
-                  <span class="kpi-milestone-pill" id="adminDueDay7Pill" title="Day 7 Booster">d7:<strong id="adminDueDay7">0</strong></span>
-                  <span class="kpi-milestone-pill" id="adminDueDay14Pill" title="Day 14 Booster">d14:<strong id="adminDueDay14">0</strong></span>
-                  <span class="kpi-milestone-pill" id="adminDueDay28Pill" title="Day 28 Booster">d28:<strong id="adminDueDay28">0</strong></span>
-                </div>
+                <span class="kpi-sub-label">Scheduled doses</span>
+              </div>
+              <div class="kpi-milestone-pills" id="adminDueMilestoneBreakdown" title="Breakdown by dose milestone">
+                <span class="kpi-milestone-pill" id="adminDueDay0Pill" title="Day 0 (Initial Walk-in)">d0:<strong id="adminDueDay0">0</strong></span>
+                <span class="kpi-milestone-pill" id="adminDueDay3Pill" title="Day 3 Booster">d3:<strong id="adminDueDay3">0</strong></span>
+                <span class="kpi-milestone-pill" id="adminDueDay7Pill" title="Day 7 Booster">d7:<strong id="adminDueDay7">0</strong></span>
+                <span class="kpi-milestone-pill" id="adminDueDay14Pill" title="Day 14 Booster">d14:<strong id="adminDueDay14">0</strong></span>
+                <span class="kpi-milestone-pill" id="adminDueDay28Pill" title="Day 28 Booster">d28:<strong id="adminDueDay28">0</strong></span>
               </div>
             </div>
 
@@ -802,6 +749,7 @@
                   <span class="kpi-trend-sub">YoY</span>
                 </div>
               </div>
+              <span class="kpi-meta">Requires clinical recall</span>
             </div>
 
             <!-- 4. Multi-Vaccine Stock Health & Runway Card -->
@@ -844,19 +792,26 @@
 
             <!-- 5. Active PEP Patients -->
             <div class="kpi-card kpi-clickable" data-jump-nav="viewAdminRegistry">
-              <span class="kpi-label">Active PEP Patients</span>
+              <div class="kpi-header-row">
+                <span class="kpi-label">Active PEP Patients</span>
+              </div>
               <div class="kpi-content-split">
                 <strong class="kpi-value tabular-num" id="adminKpiActivePep">10</strong>
                 <div class="kpi-trend-inline">
                   <span class="kpi-trend-val text-green">+0.7% &#9650;</span>
                 </div>
               </div>
+              <span class="kpi-meta">Ongoing PEP regimens</span>
             </div>
 
             <!-- 6. High Surge Puroks -->
             <div class="kpi-card kpi-clickable" data-jump-nav="viewAdminRegistry">
-              <span class="kpi-label">High Surge Puroks</span>
-              <strong class="kpi-value tabular-num" id="adminKpiSurgePuroks">4</strong>
+              <div class="kpi-header-row">
+                <span class="kpi-label">High Surge Puroks</span>
+              </div>
+              <div class="kpi-content-split">
+                <strong class="kpi-value tabular-num" id="adminKpiSurgePuroks">4</strong>
+              </div>
               <span class="kpi-meta">Hotspot areas</span>
             </div>
           </div>
@@ -948,7 +903,59 @@
           </div>
           <!-- End Row 1.5: Active Operational Workflow -->
 
-          
+          <!-- Clinical Restock & FEFO Expiration Alert Group -->
+          <div id="adminStockAlertsContainer" class="admin-alerts-container">
+            <!-- 1. Critical Restock Warning Banner -->
+            <div id="adminStockAlertsBanner" class="clinic-alert-banner banner-danger hidden" role="alert">
+              <div class="alert-icon-col">
+                <i class="fas fa-exclamation-triangle alert-icon-pulse" aria-hidden="true"></i>
+              </div>
+              <div class="alert-content-col">
+                <div class="alert-title-row">
+                  <strong class="alert-title">CRITICAL VACCINE RESTOCK REQUIRED</strong>
+                  <span class="badge badge-red badge-sm" id="adminStockAlertCountBadge">1 Biologic Depleted</span>
+                </div>
+                <div class="alert-message" id="adminStockAlertMessage">
+                  <!-- Dynamically rendered -->
+                </div>
+                <div class="alert-actions-row">
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-danger alert-action-btn"
+                    id="adminBannerRestockBtn"
+                    data-jump-nav="viewAdminInventory"
+                    data-focus-input="invBrandName"
+                  >
+                    <i class="fas fa-truck-loading" aria-hidden="true"></i> Restock Depleted Biologics
+                  </button>
+                  <button type="button" class="btn btn-sm btn-outline-danger alert-action-btn" data-jump-nav="viewAdminInventory">
+                    Inspect Batch Inventory
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- 2. Proactive FEFO Expiration Warning Banner (30–60 Days) -->
+            <div id="adminFefoAlertBanner" class="clinic-alert-banner banner-warning hidden" role="alert">
+              <div class="alert-icon-col">
+                <i class="fas fa-hourglass-half text-amber" aria-hidden="true"></i>
+              </div>
+              <div class="alert-content-col">
+                <div class="alert-title-row">
+                  <strong class="alert-title">PROACTIVE FEFO EXPIRY WARNING (30–60 DAYS)</strong>
+                  <span class="badge badge-amber badge-sm" id="adminFefoAlertCountBadge">1 Batch Approaching Expiry</span>
+                </div>
+                <div class="alert-message" id="adminFefoAlertMessage">
+                  <!-- Dynamically rendered -->
+                </div>
+                <div class="alert-actions-row">
+                  <button type="button" class="btn btn-sm btn-outline-warning alert-action-btn" data-jump-nav="viewAdminInventory">
+                    <i class="fas fa-boxes" aria-hidden="true"></i> Prioritize FEFO Dispensing
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
 
           <!-- Section: Epidemiological Surveillance & Vector Analytics -->
           <section class="epidemiological-surveillance-container" id="adminEpidemiologicalSurveillanceSection" aria-label="Epidemiological Surveillance">
@@ -1017,16 +1024,16 @@
                 <div class="analytics-card-header">
                   <div>
                     <h3 class="panel-title">Walk-In &amp; Outcome Trend</h3>
-                    <div class="panel-sub-drill">Drill down: Year &gt; Quarter &gt; Month &gt; Day</div>
+                    <div class="panel-sub-drill">Drill down: Year &gt; Quarter &gt; Month &gt; Week</div>
                   </div>
                   <div class="header-trend-controls">
                     <button type="button" class="btn-crumb-back" data-reset="trend" title="Reset trend view">
                       <i class="fas fa-undo"></i> Back
                     </button>
                     <div class="trend-toggle-group">
-                      <span class="trend-badge"><i class="fas fa-bars"></i> Line</span>
-                      <span class="trend-badge"><i class="fas fa-table"></i> All Data</span>
-                      <span class="trend-badge">Year <i class="fas fa-caret-down"></i></span>
+                      <span class="trend-badge"><i class="fas fa-chart-bar"></i> Combo</span>
+                      <span class="trend-badge"><i class="fas fa-table"></i> Live 2026</span>
+                      <span class="trend-badge">Weekly <i class="fas fa-caret-down"></i></span>
                     </div>
                   </div>
                 </div>
@@ -1035,29 +1042,29 @@
                 </div>
                 <div class="trend-yoy-row" id="trendYoYRow"></div>
                 <div class="trend-footer-legend" id="trendFooterLegend">
-                  <span class="legend-item"><span class="legend-dot dot-purple"></span> Total Intakes</span>
-                  <span class="legend-item"><span class="legend-dot dot-lavender"></span> Total Outcomes</span>
-                  <span class="legend-item"><span class="legend-dot dot-green"></span> YoY% Intakes</span>
+                  <span class="legend-item"><span class="legend-dot dot-purple"></span> Walk-In Intakes</span>
+                  <span class="legend-item"><span class="legend-dot" style="background:#DC2626;"></span> Category III Severe</span>
+                  <span class="legend-item"><span class="legend-dot dot-lavender"></span> Doses Administered</span>
                 </div>
               </div>
 
               <!-- Middle Subgrid: Purok Locations & Bite Severity -->
               <div class="middle-subgrid-2col">
-                <!-- Subcard 1: Intake Volume by Top 5 Purok Locations -->
+                <!-- Subcard 1: Intake Volume by Purok Locations -->
                 <div class="panel-card chart-card analytics-card">
                   <div class="analytics-card-header">
                     <div class="header-left">
                       <button type="button" class="btn-crumb-back" data-reset="purok" title="Reset filter">
                         <i class="fas fa-undo"></i> Back
                       </button>
-                      <h3 class="panel-title">Intake Volume by Top 5 Purok Locations</h3>
+                      <h3 class="panel-title">Intake Volume by Purok Locations</h3>
                     </div>
-                    <button type="button" class="btn-card-info" data-info="purok" title="Purok intake volume">
+                    <button type="button" class="btn-card-info" data-info="purok" title="Canonical Purok 1-7 intake volume">
                       <i class="far fa-question-circle"></i>
                     </button>
                   </div>
                   <div class="chart-container chart-container-hbar">
-                    <canvas id="purokChart" aria-label="Intake Volume by Top 5 Purok Locations"></canvas>
+                    <canvas id="purokChart" aria-label="Intake Volume by Purok Locations"></canvas>
                   </div>
                 </div>
 
@@ -1122,29 +1129,8 @@
 
           
 
-          <!-- Row 3: Clinic Operations & System Audit Trail -->
-          <div class="operations-decluttered-strip" style="margin-top: 18px; margin-bottom: 20px;">
-            <div class="panel-card" style="display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; background: #FAF5FF; border: 1px solid #E9D5FF; border-radius: 8px;">
-              <div style="display: flex; align-items: center; gap: 12px;">
-                <i class="fas fa-boxes-stacked" style="font-size: 20px; color: var(--brand-purple);"></i>
-                <div>
-                  <strong style="color: #4A044E; font-size: 14px;">Granular Biologic Lot Batches &amp; 90-Day Forecast</strong>
-                  <div class="cell-sub" style="margin: 0;">Detailed lot numbers, manufacturer expiries, and consumption forecasts are managed in Vaccine Stock.</div>
-                </div>
-              </div>
-              <button type="button" class="btn btn-outline-sm" data-jump-nav="viewAdminInventory" data-focus-input="invBrandName">
-                Manage Vaccine Stock &amp; Restock <i class="fas fa-arrow-right" style="margin-left: 4px;"></i>
-              </button>
-            </div>
-          </div>
-
           <!-- Preserved Background DOM Containers for Automated Tests & Real-Time Sync -->
           <div class="hidden" aria-hidden="true" style="display: none;">
-            <table class="clinical-table">
-              <tbody id="forecastVialsTableBody"></tbody>
-              <tbody id="adminOverviewStockBody"></tbody>
-              <tbody id="forecastWeeklyTableBody"></tbody>
-            </table>
             <canvas id="patientMixChart"></canvas>
             <button id="toggleOperationsBtn"></button>
             <div id="operationsSectionToggle"></div>
@@ -1260,6 +1246,14 @@
                 </div>
               </form>
             </div>
+          </div>
+
+          <div class="hidden" aria-hidden="true" style="display: none;">
+            <table class="clinical-table">
+              <tbody id="forecastVialsTableBody"></tbody>
+              <tbody id="adminOverviewStockBody"></tbody>
+              <tbody id="forecastWeeklyTableBody"></tbody>
+            </table>
           </div>
         </section>
 
@@ -1491,13 +1485,13 @@
           <div class="form-group">
             <label for="editPatientPurok">Purok (Barangay Kapitan Pepe) *</label>
             <select id="editPatientPurok" required>
-              <option value="Purok 1, Kapitan Pepe">Purok 1, Kapitan Pepe</option>
-              <option value="Purok 2, Kapitan Pepe">Purok 2, Kapitan Pepe</option>
-              <option value="Purok 3, Kapitan Pepe">Purok 3, Kapitan Pepe</option>
-              <option value="Purok 4, Kapitan Pepe">Purok 4, Kapitan Pepe</option>
-              <option value="Purok 5, Kapitan Pepe">Purok 5, Kapitan Pepe</option>
-              <option value="Purok 6, Kapitan Pepe">Purok 6, Kapitan Pepe</option>
-              <option value="Purok 7, Kapitan Pepe">Purok 7, Kapitan Pepe</option>
+              <option value="Purok 1 (Centro)">Purok 1 (Centro)</option>
+              <option value="Purok 2 (Mabini Ext.)">Purok 2 (Mabini Ext.)</option>
+              <option value="Purok 3 (Rizal St.)">Purok 3 (Rizal St.)</option>
+              <option value="Purok 4 (Del Pilar)">Purok 4 (Del Pilar)</option>
+              <option value="Purok 5 (Maharlika)">Purok 5 (Maharlika)</option>
+              <option value="Purok 6 (Riverbank)">Purok 6 (Riverbank)</option>
+              <option value="Purok 7 (Narra St.)">Purok 7 (Narra St.)</option>
             </select>
           </div>
         </div>
