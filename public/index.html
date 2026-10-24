@@ -10,7 +10,7 @@
     href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700&display=swap"
     rel="stylesheet"
   />
-  <link rel="stylesheet" href="/css/styles.css?v=11" />
+  <link rel="stylesheet" href="/css/styles.css?v=12" />
   <link
     rel="stylesheet"
     href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
@@ -861,92 +861,7 @@
             </div>
           </div>
 
-          <!-- Row 1.5: Active Operational Workflow & Real-Time Queues -->
-          <div class="grid-2-col-equal mb-16 operational-workflow-section" id="adminOperationalWorkflowRow">
-            <!-- Left Card: Live Triage Queue -->
-            <div class="panel-card triage-queue-card">
-              <div class="panel-header">
-                <div>
-                  <h3 class="panel-title">
-                    <i class="fas fa-stethoscope" style="color: var(--brand-purple); margin-right: 6px;"></i>
-                    Live Triage Queue
-                  </h3>
-                  <span class="cell-sub">Patients checked-in and waiting for physician triage</span>
-                </div>
-                <div style="display: flex; align-items: center; gap: 8px;">
-                  <span class="badge badge-amber" id="adminOverviewTriageCount">0 Waiting</span>
-                  <button
-                    type="button"
-                    class="btn btn-outline-sm"
-                    data-jump-nav="viewPhysTriage"
-                    title="Open Doctor's Triage View"
-                  >
-                    Open Triage <i class="fas fa-arrow-right" style="margin-left: 4px;"></i>
-                  </button>
-                </div>
-              </div>
-              <div class="table-container table-scroll-container" style="max-height: 280px;">
-                <table class="clinical-table">
-                  <thead>
-                    <tr>
-                      <th class="col-id">Patient ID</th>
-                      <th>Patient Name</th>
-                      <th>Animal Vector</th>
-                      <th>Purok / Community</th>
-                      <th class="num-col">Arrival</th>
-                      <th>Status</th>
-                      <th style="text-align: right;">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody id="adminOverviewTriageBody"></tbody>
-                </table>
-              </div>
-            </div>
-
-            <!-- Right Card: Actionable Defaulter Tracking & Clinical Recall -->
-            <div class="panel-card defaulter-recall-card">
-              <div class="panel-header">
-                <div>
-                  <h3 class="panel-title">
-                    <i class="fas fa-exclamation-triangle" style="color: var(--brand-red); margin-right: 6px;"></i>
-                    Defaulter Tracking &amp; Clinical Recall
-                  </h3>
-                  <span class="cell-sub">Missed booster doses requiring immediate recall outreach</span>
-                </div>
-                <div style="display: flex; align-items: center; gap: 8px;">
-                  <span class="badge badge-red" id="adminOverviewDefaulterAlertBadge">
-                    <i class="fas fa-bell" style="margin-right: 4px;"></i>
-                    <span id="adminOverviewDefaulterCount">0</span> Overdue
-                  </span>
-                  <button
-                    type="button"
-                    class="btn btn-outline-sm text-red"
-                    data-jump-nav="viewAdminRegistry"
-                    data-focus-input="adminRegistrySearchInput"
-                    title="View Defaulters in Registry"
-                  >
-                    View Registry <i class="fas fa-arrow-right" style="margin-left: 4px;"></i>
-                  </button>
-                </div>
-              </div>
-              <div class="table-container table-scroll-container" style="max-height: 280px;">
-                <table class="clinical-table">
-                  <thead>
-                    <tr>
-                      <th class="col-id">Patient ID</th>
-                      <th>Patient &amp; Contact</th>
-                      <th>Missed Dose</th>
-                      <th class="num-col">Due Date</th>
-                      <th>Days Overdue</th>
-                      <th style="text-align: right;">Recall Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody id="adminOverviewDefaultersBody"></tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-          <!-- End Row 1.5: Active Operational Workflow -->
+          
 
           <!-- Row 2: Visual Clinical Analytics (3-Column Layout Matching Reference Screenshot) -->
           <div class="analytics-dashboard-3col">
@@ -1064,20 +979,6 @@
 
             <!-- RIGHT COLUMN: Seasonal & Daily Intake Patterns + Treatment Outcomes -->
             <div class="analytics-col analytics-col-right">
-              <!-- Card 1: Seasonal & Daily Intake Patterns -->
-              <div class="panel-card chart-card analytics-card">
-                <div class="analytics-card-header">
-                  <h3 class="panel-title">Seasonal &amp; Daily Intake Patterns</h3>
-                </div>
-                <div class="heatmap-container-box">
-                  <table class="heatmap-matrix-table" id="seasonalHeatmapGrid"></table>
-                </div>
-                <!-- Preserved canvas peakTrafficChart hidden or synced for tests -->
-                <div class="hidden">
-                  <canvas id="peakTrafficChart"></canvas>
-                </div>
-              </div>
-
               <!-- Card 2: PEP Regimen Progression & Adherence Funnel -->
               <div class="panel-card chart-card analytics-card">
                 <div class="analytics-card-header">
@@ -1095,8 +996,111 @@
                   <canvas id="doseFunnelChart" aria-label="PEP Regimen Progression &amp; Adherence Funnel"></canvas>
                 </div>
               </div>
+
+              <!-- Card 1: Seasonal & Daily Intake Patterns -->
+              <div class="panel-card chart-card analytics-card">
+                <div class="analytics-card-header">
+                  <h3 class="panel-title">Seasonal &amp; Daily Intake Patterns</h3>
+                </div>
+                <div class="heatmap-container-box">
+                  <table class="heatmap-matrix-table" id="seasonalHeatmapGrid"></table>
+                </div>
+                <!-- Preserved canvas peakTrafficChart hidden or synced for tests -->
+                <div class="hidden">
+                  <canvas id="peakTrafficChart"></canvas>
+                </div>
+              </div>
+
+              
             </div>
           </div>
+
+          <!-- Row 1.5: Active Operational Workflow & Real-Time Queues -->
+          <div class="grid-2-col-equal mb-16 operational-workflow-section" id="adminOperationalWorkflowRow">
+            <!-- Left Card: Live Triage Queue -->
+            <div class="panel-card triage-queue-card">
+              <div class="panel-header">
+                <div>
+                  <h3 class="panel-title">
+                    <i class="fas fa-stethoscope" style="color: var(--brand-purple); margin-right: 6px;"></i>
+                    Live Triage Queue
+                  </h3>
+                  <span class="cell-sub">Patients checked-in and waiting for physician triage</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span class="badge badge-amber" id="adminOverviewTriageCount">0 Waiting</span>
+                  <button
+                    type="button"
+                    class="btn btn-outline-sm"
+                    data-jump-nav="viewPhysTriage"
+                    title="Open Doctor's Triage View"
+                  >
+                    Open Triage <i class="fas fa-arrow-right" style="margin-left: 4px;"></i>
+                  </button>
+                </div>
+              </div>
+              <div class="table-container table-scroll-container" style="max-height: 280px;">
+                <table class="clinical-table">
+                  <thead>
+                    <tr>
+                      <th class="col-id">Patient ID</th>
+                      <th>Patient Name</th>
+                      <th>Animal Vector</th>
+                      <th>Purok / Community</th>
+                      <th class="num-col">Arrival</th>
+                      <th>Status</th>
+                      <th style="text-align: right;">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="adminOverviewTriageBody"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Right Card: Actionable Defaulter Tracking & Clinical Recall -->
+            <div class="panel-card defaulter-recall-card">
+              <div class="panel-header">
+                <div>
+                  <h3 class="panel-title">
+                    <i class="fas fa-exclamation-triangle" style="color: var(--brand-red); margin-right: 6px;"></i>
+                    Defaulter Tracking &amp; Clinical Recall
+                  </h3>
+                  <span class="cell-sub">Missed booster doses requiring immediate recall outreach</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span class="badge badge-red" id="adminOverviewDefaulterAlertBadge">
+                    <i class="fas fa-bell" style="margin-right: 4px;"></i>
+                    <span id="adminOverviewDefaulterCount">0</span> Overdue
+                  </span>
+                  <button
+                    type="button"
+                    class="btn btn-outline-sm text-red"
+                    data-jump-nav="viewAdminRegistry"
+                    data-focus-input="adminRegistrySearchInput"
+                    title="View Defaulters in Registry"
+                  >
+                    View Registry <i class="fas fa-arrow-right" style="margin-left: 4px;"></i>
+                  </button>
+                </div>
+              </div>
+              <div class="table-container table-scroll-container" style="max-height: 280px;">
+                <table class="clinical-table">
+                  <thead>
+                    <tr>
+                      <th class="col-id">Patient ID</th>
+                      <th>Patient &amp; Contact</th>
+                      <th>Missed Dose</th>
+                      <th class="num-col">Due Date</th>
+                      <th>Days Overdue</th>
+                      <th style="text-align: right;">Recall Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="adminOverviewDefaultersBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <!-- End Row 1.5: Active Operational Workflow -->
 
           <!-- Row 3: Operational Logistics, Vaccine Forecast & System Audit -->
           <div class="panel-card operations-card-collapsible">
@@ -1553,6 +1557,6 @@
     </div>
   </div>
 
-  <script src="/js/app.js?v=38"></script>
+  <script src="/js/app.js?v=39"></script>
 </body>
 </html>

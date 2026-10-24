@@ -1583,7 +1583,9 @@ function renderExposurePieChart() {
 
   const counts = {};
   filteredPatients.forEach((p) => {
-    const a = p.animalType || 'Other';
+    let a = p.animalType || 'Domestic Dog';
+    if (a === 'Dog') a = 'Domestic Dog';
+    if (a === 'Cat') a = 'Domestic Cat';
     counts[a] = (counts[a] || 0) + 1;
   });
 
@@ -1913,8 +1915,16 @@ function renderBiteSeverityChart() {
     else counts['Pending Physician Assessment'] += 1;
   });
 
+  const DISPLAY_LABELS = {
+    'Category III - High Risk': ['Category III', '(High Risk)'],
+    'Category II - Moderate Risk': ['Category II', '(Moderate)'],
+    'Category I - Low Risk': ['Category I', '(Low Risk)'],
+    'Pending Physician Assessment': ['Pending', 'Assessment']
+  };
+
   const activeEntries = Object.entries(counts).filter(([_, count]) => count > 0);
-  const labels = activeEntries.map(([lbl]) => lbl);
+  const fullTitles = activeEntries.map(([lbl]) => lbl);
+  const labels = activeEntries.map(([lbl]) => DISPLAY_LABELS[lbl] || lbl);
   const data = activeEntries.map(([_, count]) => count);
   const colors = ['#3B0D47', '#6B21A8', '#8B5CF6', '#94A3B8'];
 
@@ -1938,7 +1948,7 @@ function renderBiteSeverityChart() {
       responsive: true,
       maintainAspectRatio: false,
       layout: {
-        padding: { left: 24, right: 48, top: 4, bottom: 4 }
+        padding: { left: 16, right: 36, top: 4, bottom: 4 }
       },
       scales: {
         x: {
@@ -1948,8 +1958,8 @@ function renderBiteSeverityChart() {
         y: {
           grid: { display: false },
           ticks: {
-            padding: 8,
-            font: { family: 'Inter, sans-serif', size: 10, weight: '500' },
+            padding: 6,
+            font: { family: 'Plus Jakarta Sans, sans-serif', size: 10, weight: '600' },
             color: '#334155',
             autoSkip: false
           }
@@ -1959,6 +1969,10 @@ function renderBiteSeverityChart() {
         legend: { display: false },
         tooltip: {
           callbacks: {
+            title: (items) => {
+              const idx = items[0].dataIndex;
+              return fullTitles[idx] || items[0].label;
+            },
             label: (ctx) => ` Volume: ${Number(ctx.raw).toLocaleString()} cases`
           }
         }
