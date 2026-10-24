@@ -891,6 +891,61 @@ td.num-col {
   color: #0F172A !important;
 }
 
+/* Epidemiological Surveillance Isolated Container */
+.epidemiological-surveillance-container {
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin-top: 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+.surveillance-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 16px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid #E2E8F0;
+}
+
+.surveillance-title-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.surveillance-icon-box {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: #F3E8FF;
+  color: #7A1FA2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+}
+
+.surveillance-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #1E293B;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.badge-purple-subtle {
+  background: #F3E8FF;
+  color: #7A1FA2;
+  border: 1px solid #E9D5FF;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 6px;
+}
+
 /* 3-Column Analytics Layout */
 .analytics-dashboard-3col {
   display: grid;

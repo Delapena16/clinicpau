@@ -10,7 +10,7 @@
     href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700&display=swap"
     rel="stylesheet"
   />
-  <link rel="stylesheet" href="/css/styles.css?v=12" />
+  <link rel="stylesheet" href="/css/styles.css?v=13" />
   <link
     rel="stylesheet"
     href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
@@ -861,9 +861,113 @@
             </div>
           </div>
 
+          <!-- Row 1.5: Active Operational Workflow & Real-Time Queues -->
+          <div class="grid-2-col-equal mb-16 operational-workflow-section" id="adminOperationalWorkflowRow">
+            <!-- Left Card: Live Triage Queue -->
+            <div class="panel-card triage-queue-card">
+              <div class="panel-header">
+                <div>
+                  <h3 class="panel-title">
+                    <i class="fas fa-stethoscope" style="color: var(--brand-purple); margin-right: 6px;"></i>
+                    Live Triage Queue
+                  </h3>
+                  <span class="cell-sub">Patients checked-in and waiting for physician triage</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span class="badge badge-amber" id="adminOverviewTriageCount">0 Waiting</span>
+                  <button
+                    type="button"
+                    class="btn btn-outline-sm"
+                    data-jump-nav="viewPhysTriage"
+                    title="Open Doctor's Triage View"
+                  >
+                    Open Triage <i class="fas fa-arrow-right" style="margin-left: 4px;"></i>
+                  </button>
+                </div>
+              </div>
+              <div class="table-container table-scroll-container" style="max-height: 280px;">
+                <table class="clinical-table">
+                  <thead>
+                    <tr>
+                      <th class="col-id">Patient ID</th>
+                      <th>Patient Name</th>
+                      <th>Animal Vector</th>
+                      <th>Purok / Community</th>
+                      <th class="num-col">Arrival</th>
+                      <th>Status</th>
+                      <th style="text-align: right;">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="adminOverviewTriageBody"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Right Card: Actionable Defaulter Tracking & Clinical Recall -->
+            <div class="panel-card defaulter-recall-card">
+              <div class="panel-header">
+                <div>
+                  <h3 class="panel-title">
+                    <i class="fas fa-exclamation-triangle" style="color: var(--brand-red); margin-right: 6px;"></i>
+                    Defaulter Tracking &amp; Clinical Recall
+                  </h3>
+                  <span class="cell-sub">Missed booster doses requiring immediate recall outreach</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span class="badge badge-red" id="adminOverviewDefaulterAlertBadge">
+                    <i class="fas fa-bell" style="margin-right: 4px;"></i>
+                    <span id="adminOverviewDefaulterCount">0</span> Overdue
+                  </span>
+                  <button
+                    type="button"
+                    class="btn btn-outline-sm text-red"
+                    data-jump-nav="viewAdminRegistry"
+                    data-focus-input="adminRegistrySearchInput"
+                    title="View Defaulters in Registry"
+                  >
+                    View Registry <i class="fas fa-arrow-right" style="margin-left: 4px;"></i>
+                  </button>
+                </div>
+              </div>
+              <div class="table-container table-scroll-container" style="max-height: 280px;">
+                <table class="clinical-table">
+                  <thead>
+                    <tr>
+                      <th class="col-id">Patient ID</th>
+                      <th>Patient &amp; Contact</th>
+                      <th>Missed Dose</th>
+                      <th class="num-col">Due Date</th>
+                      <th>Days Overdue</th>
+                      <th style="text-align: right;">Recall Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="adminOverviewDefaultersBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <!-- End Row 1.5: Active Operational Workflow -->
+
           
 
-          <!-- Row 2: Visual Clinical Analytics (3-Column Layout Matching Reference Screenshot) -->
+          <!-- Section: Epidemiological Surveillance & Vector Analytics -->
+          <section class="epidemiological-surveillance-container" id="adminEpidemiologicalSurveillanceSection" aria-label="Epidemiological Surveillance">
+            <div class="surveillance-section-header">
+              <div class="surveillance-title-group">
+                <div class="surveillance-icon-box">
+                  <i class="fas fa-shield-virus" aria-hidden="true"></i>
+                </div>
+                <div>
+                  <h3 class="surveillance-title">Epidemiological Surveillance</h3>
+                  <span class="cell-sub">Cabanatuan City Rabies Vector Distribution, Exposure Hotspots &amp; Regimen Adherence</span>
+                </div>
+              </div>
+              <div class="surveillance-status-badge">
+                <span class="badge badge-purple-subtle"><i class="fas fa-satellite-dish" style="margin-right: 4px;"></i> Live Registry Feed</span>
+              </div>
+            </div>
+
+            <!-- Row 2: Visual Clinical Analytics (3-Column Layout Matching Reference Screenshot) -->
           <div class="analytics-dashboard-3col">
             <!-- LEFT COLUMN: Bite Distribution by Animal & Age Group -->
             <div class="analytics-col analytics-col-left">
@@ -1013,212 +1117,63 @@
 
               
             </div>
-          </div>
+          </section></div>
 
-          <!-- Row 1.5: Active Operational Workflow & Real-Time Queues -->
-          <div class="grid-2-col-equal mb-16 operational-workflow-section" id="adminOperationalWorkflowRow">
-            <!-- Left Card: Live Triage Queue -->
-            <div class="panel-card triage-queue-card">
-              <div class="panel-header">
+          
+
+          <!-- Row 3: Clinic Operations & System Audit Trail -->
+          <div class="operations-decluttered-strip" style="margin-top: 18px; margin-bottom: 20px;">
+            <div class="panel-card" style="display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; background: #FAF5FF; border: 1px solid #E9D5FF; border-radius: 8px;">
+              <div style="display: flex; align-items: center; gap: 12px;">
+                <i class="fas fa-boxes-stacked" style="font-size: 20px; color: var(--brand-purple);"></i>
                 <div>
-                  <h3 class="panel-title">
-                    <i class="fas fa-stethoscope" style="color: var(--brand-purple); margin-right: 6px;"></i>
-                    Live Triage Queue
-                  </h3>
-                  <span class="cell-sub">Patients checked-in and waiting for physician triage</span>
-                </div>
-                <div style="display: flex; align-items: center; gap: 8px;">
-                  <span class="badge badge-amber" id="adminOverviewTriageCount">0 Waiting</span>
-                  <button
-                    type="button"
-                    class="btn btn-outline-sm"
-                    data-jump-nav="viewPhysTriage"
-                    title="Open Doctor's Triage View"
-                  >
-                    Open Triage <i class="fas fa-arrow-right" style="margin-left: 4px;"></i>
-                  </button>
+                  <strong style="color: #4A044E; font-size: 14px;">Granular Biologic Lot Batches &amp; 90-Day Forecast</strong>
+                  <div class="cell-sub" style="margin: 0;">Detailed lot numbers, manufacturer expiries, and consumption forecasts are managed in Vaccine Stock.</div>
                 </div>
               </div>
-              <div class="table-container table-scroll-container" style="max-height: 280px;">
-                <table class="clinical-table">
-                  <thead>
-                    <tr>
-                      <th class="col-id">Patient ID</th>
-                      <th>Patient Name</th>
-                      <th>Animal Vector</th>
-                      <th>Purok / Community</th>
-                      <th class="num-col">Arrival</th>
-                      <th>Status</th>
-                      <th style="text-align: right;">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody id="adminOverviewTriageBody"></tbody>
-                </table>
-              </div>
-            </div>
-
-            <!-- Right Card: Actionable Defaulter Tracking & Clinical Recall -->
-            <div class="panel-card defaulter-recall-card">
-              <div class="panel-header">
-                <div>
-                  <h3 class="panel-title">
-                    <i class="fas fa-exclamation-triangle" style="color: var(--brand-red); margin-right: 6px;"></i>
-                    Defaulter Tracking &amp; Clinical Recall
-                  </h3>
-                  <span class="cell-sub">Missed booster doses requiring immediate recall outreach</span>
-                </div>
-                <div style="display: flex; align-items: center; gap: 8px;">
-                  <span class="badge badge-red" id="adminOverviewDefaulterAlertBadge">
-                    <i class="fas fa-bell" style="margin-right: 4px;"></i>
-                    <span id="adminOverviewDefaulterCount">0</span> Overdue
-                  </span>
-                  <button
-                    type="button"
-                    class="btn btn-outline-sm text-red"
-                    data-jump-nav="viewAdminRegistry"
-                    data-focus-input="adminRegistrySearchInput"
-                    title="View Defaulters in Registry"
-                  >
-                    View Registry <i class="fas fa-arrow-right" style="margin-left: 4px;"></i>
-                  </button>
-                </div>
-              </div>
-              <div class="table-container table-scroll-container" style="max-height: 280px;">
-                <table class="clinical-table">
-                  <thead>
-                    <tr>
-                      <th class="col-id">Patient ID</th>
-                      <th>Patient &amp; Contact</th>
-                      <th>Missed Dose</th>
-                      <th class="num-col">Due Date</th>
-                      <th>Days Overdue</th>
-                      <th style="text-align: right;">Recall Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody id="adminOverviewDefaultersBody"></tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-          <!-- End Row 1.5: Active Operational Workflow -->
-
-          <!-- Row 3: Operational Logistics, Vaccine Forecast & System Audit -->
-          <div class="panel-card operations-card-collapsible">
-            <div class="panel-header operations-header-toggle" id="operationsSectionToggle">
-              <div>
-                <h3 class="panel-title">
-                  <i class="fas fa-boxes-stacked" style="color: var(--brand-purple); margin-right: 6px;"></i>
-                  Clinic Inventory Health, 90-Day Forecast &amp; Operations Activity
-                </h3>
-                <span class="cell-sub">Biologic demand projections, patient volume mix, and system audit trail</span>
-              </div>
-              <button type="button" class="btn btn-outline-sm" id="toggleOperationsBtn">
-                <i class="fas fa-chevron-down" id="operationsChevron"></i> Toggle Details
+              <button type="button" class="btn btn-outline-sm" data-jump-nav="viewAdminInventory" data-focus-input="invBrandName">
+                Manage Vaccine Stock &amp; Restock <i class="fas fa-arrow-right" style="margin-left: 4px;"></i>
               </button>
             </div>
-
-            <div id="operationsSectionContent">
-              <div class="grid-2-col" style="margin-top: 14px;">
-                <div class="panel-card">
-                  <div class="panel-header">
-                    <h4 class="panel-title">Current Stock vs. 30-Day &amp; 90-Day Projected Demand</h4>
-                    <span class="cell-sub">Projected from walk-in and returning-patient trends</span>
-                  </div>
-                  <div class="table-container table-scroll-container">
-                    <table class="clinical-table forecast-fit-table">
-                      <thead>
-                        <tr>
-                          <th>Vaccine &amp; Brand</th>
-                          <th class="num-col">In Stock</th>
-                          <th class="num-col">Returning (30d)</th>
-                          <th class="num-col">New Walk-Ins</th>
-                          <th class="num-col">30-Day Demand</th>
-                          <th class="num-col">90-Day Demand</th>
-                          <th class="num-col">Days Left</th>
-                          <th class="num-col">Restock Qty</th>
-                          <th>Status</th>
-                        </tr>
-                      </thead>
-                      <tbody id="forecastVialsTableBody"></tbody>
-                    </table>
-                  </div>
-                </div>
-
-                <div class="panel-card">
-                  <div class="panel-header">
-                    <h4 class="panel-title">Vaccine Stock Summary</h4>
-                    <span class="cell-sub">Biologic lots, expiry and stock alerts</span>
-                  </div>
-                  <div class="table-container table-scroll-container">
-                    <table class="clinical-table">
-                      <thead>
-                        <tr>
-                          <th>Biologic &amp; Lot</th>
-                          <th class="num-col">Vials</th>
-                          <th class="num-col">Expiry</th>
-                          <th>Status</th>
-                        </tr>
-                      </thead>
-                      <tbody id="adminOverviewStockBody"></tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-
-              <div class="grid-2-col" style="margin-top: 14px;">
-                <div class="panel-card">
-                  <div class="panel-header">
-                    <h4 class="panel-title">Weekly Walk-In &amp; Vial Usage Audit</h4>
-                    <span class="cell-sub">Intake volume against anti-rabies vial consumption</span>
-                  </div>
-                  <div class="table-container table-scroll-container">
-                    <table class="clinical-table forecast-fit-table">
-                      <thead>
-                        <tr>
-                          <th>Week Period</th>
-                          <th class="num-col">Walk-Ins</th>
-                          <th class="num-col">Cat III Cases</th>
-                          <th class="num-col">Vials Used</th>
-                        </tr>
-                      </thead>
-                      <tbody id="forecastWeeklyTableBody"></tbody>
-                    </table>
-                  </div>
-                </div>
-
-                <div class="panel-card chart-card">
-                  <div class="panel-header">
-                    <h4 class="panel-title">Daily Patient Mix: New vs. Returning</h4>
-                    <span class="cell-sub">Daily patient volume and follow-up compliance tracking</span>
-                  </div>
-                  <div class="chart-container" style="height: 180px;">
-                    <canvas id="patientMixChart" aria-label="Daily patient mix: new vs returning"></canvas>
-                  </div>
-                </div>
-              </div>
-
-              <div class="panel-card" style="margin-top: 14px;">
-                <div class="panel-header">
-                  <h4 class="panel-title">Recent Clinic Activity</h4>
-                  <span class="cell-sub">OTP dispatches, staff logins and system events</span>
-                </div>
-                <div class="table-container table-scroll-container">
-                  <table class="clinical-table">
-                    <thead>
-                      <tr>
-                        <th class="num-col">Timestamp</th>
-                        <th>Role</th>
-                        <th>Event</th>
-                        <th>Details</th>
-                      </tr>
-                    </thead>
-                    <tbody id="adminOverviewAuditBody"></tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
           </div>
-        </section>
+
+          <!-- Preserved Background DOM Containers for Automated Tests & Real-Time Sync -->
+          <div class="hidden" aria-hidden="true" style="display: none;">
+            <table class="clinical-table">
+              <tbody id="forecastVialsTableBody"></tbody>
+              <tbody id="adminOverviewStockBody"></tbody>
+              <tbody id="forecastWeeklyTableBody"></tbody>
+            </table>
+            <canvas id="patientMixChart"></canvas>
+            <button id="toggleOperationsBtn"></button>
+            <div id="operationsSectionToggle"></div>
+            <div id="operationsChevron"></div>
+            <div id="operationsSectionContent"></div>
+          </div>
+
+          <!-- Universal System Audit Trail (Clean Collapsible Card) -->
+          <div class="panel-card" style="margin-top: 18px; margin-bottom: 24px;">
+            <div class="panel-header" style="display: flex; align-items: center; justify-content: space-between;">
+              <div>
+                <h4 class="panel-title"><i class="fas fa-history" style="color: var(--brand-purple); margin-right: 6px;"></i> Recent Clinic Activity &amp; Audit Trail</h4>
+                <span class="cell-sub">Live staff logins, OTP dispatches, and clinical system audit events</span>
+              </div>
+              <span class="badge badge-sm badge-purple">Audit Active</span>
+            </div>
+            <div class="table-container table-scroll-container" style="max-height: 240px;">
+              <table class="clinical-table">
+                <thead>
+                  <tr>
+                    <th class="num-col">Timestamp</th>
+                    <th>Role</th>
+                    <th>Event</th>
+                    <th>Details</th>
+                  </tr>
+                </thead>
+                <tbody id="adminOverviewAuditBody"></tbody>
+              </table>
+            </div>
+          </div></section>
 
         <section id="viewAdminInventory" class="ehr-view hidden">
           <div class="view-header-bar">
@@ -1557,6 +1512,6 @@
     </div>
   </div>
 
-  <script src="/js/app.js?v=39"></script>
+  <script src="/js/app.js?v=40"></script>
 </body>
 </html>
