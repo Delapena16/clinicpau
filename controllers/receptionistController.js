@@ -119,12 +119,12 @@ const registerWalkInPatient = async (req, res) => {
     const resolvedBiteStatus = (biteStatus || 'Bite - Unprovoked').trim();
     const walkInDateObj = day0WalkInDate ? new Date(day0WalkInDate) : new Date();
 
-    let resolvedAnimal = (animalType || 'Dog').trim();
-    if (resolvedAnimal === 'Domestic Dog') resolvedAnimal = 'Dog';
-    if (resolvedAnimal === 'Domestic Cat') resolvedAnimal = 'Cat';
-    const validAnimalEnums = ['Dog', 'Cat', 'Stray Dog', 'Stray Cat', 'Bat', 'Other'];
+    let resolvedAnimal = (animalType || 'Domestic Dog').trim();
+    if (resolvedAnimal === 'Dog') resolvedAnimal = 'Domestic Dog';
+    if (resolvedAnimal === 'Cat') resolvedAnimal = 'Domestic Cat';
+    const validAnimalEnums = ['Domestic Dog', 'Stray Dog', 'Domestic Cat', 'Stray Cat'];
     if (!validAnimalEnums.includes(resolvedAnimal)) {
-      resolvedAnimal = 'Other';
+      resolvedAnimal = 'Domestic Dog';
     }
 
     const scheduledDates = calculatePepSchedule(walkInDateObj, false);

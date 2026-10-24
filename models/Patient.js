@@ -100,8 +100,8 @@ const patientSchema = new mongoose.Schema(
     },
     animalType: {
       type: String,
-      enum: ['Dog', 'Cat', 'Stray Dog', 'Stray Cat', 'Bat', 'Other'],
-      default: 'Dog'
+      enum: ['Domestic Dog', 'Stray Dog', 'Domestic Cat', 'Stray Cat'],
+      default: 'Domestic Dog'
     },
     biteSite: {
       type: String,

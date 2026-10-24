@@ -26,3 +26,6 @@ pyspark_etl/data/
 # Logs
 logs/
 *.log
+ 
+# Internal agent teamwork artifacts
+.agents/

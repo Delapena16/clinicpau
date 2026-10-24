@@ -2295,3 +2295,311 @@ button.dose-node {
   margin: 0 auto;
 }
 
+/* ==========================================================================
+   Milestone 2: Operational Workflow (Triage Queue & Defaulter Recall)
+   ========================================================================== */
+.operational-workflow-section {
+  margin-top: 18px;
+  margin-bottom: 20px;
+}
+
+.triage-queue-card {
+  border-top: 3px solid var(--brand-purple);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.defaulter-recall-card {
+  border-top: 3px solid var(--brand-red);
+  background-color: #FFFDFD;
+  box-shadow: 0 1px 3px rgba(229, 57, 53, 0.08);
+}
+
+.defaulter-recall-card .panel-header {
+  border-bottom: 1px solid #FEE2E2;
+}
+
+.badge-pulse {
+  animation: pulseWarning 2s infinite ease-in-out;
+}
+
+@keyframes pulseWarning {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.04); opacity: 0.9; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.btn-recall-action {
+  white-space: nowrap;
+  font-size: 11.5px;
+  padding: 4px 10px;
+}
+
+.btn-recall-action i {
+  color: #FFFFFF;
+}
+
+.phone-link {
+  color: var(--brand-purple);
+  text-decoration: none;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.phone-link:hover {
+  text-decoration: underline;
+  color: var(--brand-purple-dark);
+}
+
+/* --- M2: Milestone Breakdown Pills for Patients Due Today --- */
+.kpi-milestone-pills {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px;
+  line-height: 1.1;
+  max-width: 145px;
+}
+
+.kpi-milestone-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  background-color: #F3E8FF;
+  color: #6B21A8;
+  border: 1px solid #E9D5FF;
+  border-radius: 4px;
+  padding: 1px 4px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  cursor: default;
+  transition: background-color 0.12s ease;
+}
+
+.kpi-milestone-pill:hover {
+  background-color: #E9D5FF;
+}
+
+.kpi-milestone-pill strong {
+  font-family: var(--font-mono, monospace);
+  color: #3B0D47;
+  font-weight: 700;
+}
+
+/* ==========================================================================
+   M2: Vaccine Stock Health, Restock Banners & FEFO Expiry Alerts
+   ========================================================================== */
+
+/* Alerts group container at top of Clinic Overview */
+.admin-alerts-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 1.25rem;
+  width: 100%;
+}
+
+/* Base clinical alert banner */
+.clinic-alert-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 12px 18px;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  transition: all 0.2s ease-in-out;
+  animation: slideDownAlert 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideDownAlert {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.clinic-alert-banner .alert-icon-col {
+  font-size: 1.35rem;
+  padding-top: 2px;
+  flex-shrink: 0;
+}
+
+.alert-icon-pulse {
+  animation: alertPulse 2s infinite ease-in-out;
+}
+
+@keyframes alertPulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 0.8;
+  }
+}
+
+.clinic-alert-banner .alert-content-col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-grow: 1;
+}
+
+.clinic-alert-banner .alert-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.clinic-alert-banner .alert-title {
+  font-size: 0.92rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.clinic-alert-banner .alert-message {
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.clinic-alert-banner .alert-actions-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+/* Banner variant: Danger (Critical Restock Threshold breached) */
+.clinic-alert-banner.banner-danger {
+  background: #FEF2F2;
+  border: 1px solid #FCA5A5;
+  border-left: 5px solid #DC2626;
+  color: #991B1B;
+}
+
+.clinic-alert-banner.banner-danger .alert-title {
+  color: #B91C1C;
+}
+
+.clinic-alert-banner.banner-danger .alert-message {
+  color: #7F1D1D;
+}
+
+/* Banner variant: Warning (Proactive FEFO approaching expiration) */
+.clinic-alert-banner.banner-warning {
+  background: #FFFBEB;
+  border: 1px solid #FCD34D;
+  border-left: 5px solid #D97706;
+  color: #92400E;
+}
+
+.clinic-alert-banner.banner-warning .alert-title {
+  color: #B45309;
+}
+
+.clinic-alert-banner.banner-warning .alert-message {
+  color: #78350F;
+}
+
+/* Executive Card 4: Multi-Vaccine Stock Health & Biologic Strip */
+.superadmin-cards-wrapper .kpi-card-stock-runway {
+  min-height: 118px;
+  justify-content: flex-start;
+  gap: 4px;
+}
+
+.kpi-sub-label {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--text-muted, #6B7280);
+  font-weight: 500;
+  margin-top: -2px;
+}
+
+.kpi-burn-rate {
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.kpi-biologic-strip {
+  display: flex;
+  gap: 5px;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--border-structural, #E5E7EB);
+  flex-wrap: wrap;
+}
+
+.biologic-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #F3F4F6;
+  font-size: 0.71rem;
+  line-height: 1.2;
+  color: #374151;
+  transition: background 0.15s ease;
+}
+
+.biologic-chip:hover {
+  background: #E5E7EB;
+}
+
+.biologic-chip.chip-alert {
+  background: #FEE2E2;
+  border: 1px solid #FCA5A5;
+  color: #991B1B;
+}
+
+.chip-dot {
+  width: 6px;
+  height: 6px;
+  min-width: 6px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.chip-dot.dot-lime {
+  background: #10B981;
+}
+
+.chip-dot.dot-red {
+  background: #EF4444;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.25);
+}
+
+.chip-dot.dot-amber {
+  background: #F59E0B;
+}
+
+.chip-name {
+  font-weight: 600;
+}
+
+.chip-runway {
+  font-weight: 700;
+}
+
+.chip-meta {
+  color: inherit;
+  opacity: 0.85;
+}
+
+.badge-expired {
+  background-color: #DC2626 !important;
+  color: #FFFFFF !important;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+

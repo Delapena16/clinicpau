@@ -67,6 +67,9 @@ let peakTrafficChart = null;
 let patientMixChart = null;
 
 function showToast(message) {
+  if (typeof toastLogs !== 'undefined' && Array.isArray(toastLogs)) {
+    try { toastLogs.push(message); } catch (e) {}
+  }
   const toast = document.getElementById('toastMessage');
   if (!toast) return;
   toast.textContent = message;
@@ -125,20 +128,12 @@ function getCategoryBadgeClass(categoryText) {
 }
 
 function getPatientVisitStatus(patient) {
-  if (
-    patient.woundCategory === 'Pending' ||
-    patient.clinicalStatus === 'Waiting for Doctor' ||
-    patient.clinicalStatus === 'Needs Triage'
-  ) {
-    return { label: 'Needs Triage', badgeClass: 'badge-amber', key: 'Waiting for Doctor' };
-  }
-
+  // 1. Category I / Wound Cleansing Only (Low risk, no PEP vaccine indicated)
   if (patient.clinicalStatus === 'Wound Cleansing Only' || patient.woundCategory === 'Category I') {
     return { label: 'Wound Cleansing Only', badgeClass: 'badge-lime', key: 'Completed' };
   }
 
-  // Overdue Logic: Catch any pending doses where the scheduled date is LESS THAN today's current date.
-  // These patients are removed from the "Due Today" list and flagged as Missed / Overdue in red.
+  // 2. Overdue / Defaulter Logic: Pending doses past due date take clinical follow-up precedence
   const overduePending = (patient.pepSchedule || []).find(
     (d) => d.status === 'Pending' && String(d.scheduledDate).split('T')[0] < todayDateIso
   );
@@ -148,7 +143,7 @@ function getPatientVisitStatus(patient) {
     return { label: overdueLabel, badgeClass: 'badge-red', key: 'Missed Dose' };
   }
 
-  // Due Today Logic: Must strictly match pending doses where the scheduled date is EXACTLY equal to today's current date.
+  // 3. Due Today Logic: Unmask scheduled Day 0 walk-in patients and returning booster appointments
   const dueToday = (patient.pepSchedule || []).find(
     (d) => String(d.scheduledDate).split('T')[0] === todayDateIso && d.status === 'Pending'
   );
@@ -156,6 +151,16 @@ function getPatientVisitStatus(patient) {
     return { label: `Due Today (${dueToday.doseDay})`, badgeClass: 'badge-purple', key: 'Due Today' };
   }
 
+  // 4. Needs Triage: Patients awaiting physician assessment who do not have a pending dose today
+  if (
+    patient.woundCategory === 'Pending' ||
+    patient.clinicalStatus === 'Waiting for Doctor' ||
+    patient.clinicalStatus === 'Needs Triage'
+  ) {
+    return { label: 'Needs Triage', badgeClass: 'badge-amber', key: 'Waiting for Doctor' };
+  }
+
+  // 5. Completed: All scheduled doses fulfilled
   const allCompleted =
     (patient.pepSchedule || []).length > 0 &&
     (patient.pepSchedule || []).every((d) => d.status === 'Fulfilled');
@@ -163,6 +168,7 @@ function getPatientVisitStatus(patient) {
     return { label: 'Completed', badgeClass: 'badge-lime', key: 'Completed' };
   }
 
+  // 6. Under Treatment: Active PEP patients between appointments
   return { label: 'Under Treatment', badgeClass: 'badge-lime', key: 'Under Treatment' };
 }
 
@@ -411,6 +417,354 @@ function computePvrvRunway(inventory) {
   return Math.max(0, Math.floor(stock / averageDailyConsumption));
 }
 
+function getDueTodayBreakdown(patients) {
+  const today = todayDateIso;
+  const breakdown = { day0: 0, day3: 0, day7: 0, day14: 0, day28: 0 };
+  const DOSE_MAP = {
+    'day0': 'day0', 'day 0': 'day0',
+    'day3': 'day3', 'day 3': 'day3',
+    'day7': 'day7', 'day 7': 'day7',
+    'day14': 'day14', 'day 14': 'day14',
+    'day28': 'day28', 'day 28': 'day28'
+  };
+  (patients || []).forEach((p) => {
+    (p.pepSchedule || []).forEach((d) => {
+      if (d.status === 'Pending' && String(d.scheduledDate).split('T')[0] === today) {
+        const rawKey = String(d.doseDay || '').toLowerCase().trim();
+        const key = DOSE_MAP[rawKey] || rawKey.replace(/\s+/g, '');
+        if (breakdown[key] !== undefined) {
+          breakdown[key] += 1;
+        }
+      }
+    });
+  });
+  return breakdown;
+}
+
+function computeMultiVaccineHealth(inventory, patients, summary) {
+  const inv = inventory || [];
+  const pts = patients || [];
+
+  // If live backend summary is available with multi-vaccine inventory, utilize it directly
+  if (summary && summary.inventory && summary.inventory.pvrv && summary.inventory.erig) {
+    return {
+      pvrv: summary.inventory.pvrv,
+      antiTetanus: summary.inventory.antiTetanus || {
+        stock: 36, dailyConsumption: 1.5, runwayDays: 24, status: 'Optimal', isCriticalRestock: false
+      },
+      erig: summary.inventory.erig,
+      expiringBatches: summary.expiringBatches || []
+    };
+  }
+
+  // Pure state calculation fallback
+  const sumByType = (type) =>
+    inv
+      .filter((i) => i.vaccineType === type)
+      .reduce((acc, i) => acc + Number(i.currentStock || 0), 0);
+
+  const stockPvrv = sumByType('anti-rabies');
+  const stockTt = sumByType('anti-tetanus');
+  const stockErig = sumByType('ERIG');
+
+  // Trailing 30-day fulfilled dose consumption
+  const thirtyDaysAgoIso = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  const consumption = { 'anti-rabies': 0, 'anti-tetanus': 0, ERIG: 0 };
+
+  pts.forEach((p) => {
+    (p.pepSchedule || []).forEach((d) => {
+      if (d.status === 'Fulfilled') {
+        const dDate = String(d.dateProcessed || d.scheduledDate || '').split('T')[0];
+        if (dDate >= thirtyDaysAgoIso) {
+          let vType = d.vaccineTypeUsed || 'anti-rabies';
+          if (vType === 'PVRV') vType = 'anti-rabies';
+          if (consumption[vType] !== undefined) consumption[vType] += 1;
+          else consumption['anti-rabies'] += 1;
+        }
+      }
+    });
+  });
+
+  const buildBiologicHealth = (vType, stock, defaultBurn, safetyThreshold) => {
+    const consumed30 = consumption[vType] || 0;
+    const dailyRate = consumed30 > 0 ? Number((consumed30 / 30).toFixed(1)) : defaultBurn;
+    const runwayDays = dailyRate > 0 ? Math.max(0, Math.floor(stock / dailyRate)) : 999;
+    const lots = inv.filter((i) => i.vaccineType === vType);
+    const hasCriticalBatch = lots.some(
+      (l) => Number(l.currentStock || 0) <= Number(l.lowStockThreshold || safetyThreshold)
+    );
+    let status = 'Optimal';
+    if (stock <= 0 || stock <= safetyThreshold || runwayDays <= 10 || hasCriticalBatch) {
+      status = 'Critical Restock';
+    } else if (runwayDays <= 21 || stock <= safetyThreshold * 1.5) {
+      status = 'Reorder Soon';
+    }
+    return {
+      stock,
+      dailyConsumption: dailyRate,
+      runwayDays,
+      safetyThreshold,
+      status,
+      isCriticalRestock: status === 'Critical Restock'
+    };
+  };
+
+  const today = todayDateIso;
+  const expiringBatches = inv
+    .filter((item) => {
+      if (!item.currentStock || item.currentStock <= 0 || !item.expirationDate) return false;
+      const expStr = String(item.expirationDate).split('T')[0];
+      const diffMs = new Date(expStr) - new Date(today);
+      const days = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+      return days > 0 && days <= 60;
+    })
+    .map((item) => {
+      const expStr = String(item.expirationDate).split('T')[0];
+      const days = Math.ceil((new Date(expStr) - new Date(today)) / (1000 * 60 * 60 * 24));
+      return {
+        vaccineType: item.vaccineType === 'anti-rabies' ? 'PVRV' : item.vaccineType,
+        brandName: item.brandName,
+        batchNumber: item.batchNumber,
+        currentStock: item.currentStock,
+        expirationDate: expStr,
+        daysUntilExpiry: Math.max(0, days)
+      };
+    })
+    .sort((a, b) => a.daysUntilExpiry - b.daysUntilExpiry);
+
+  return {
+    pvrv: buildBiologicHealth('anti-rabies', stockPvrv, 4.2, 30),
+    antiTetanus: buildBiologicHealth('anti-tetanus', stockTt, 1.5, 15),
+    erig: buildBiologicHealth('ERIG', stockErig, 0.8, 10),
+    expiringBatches
+  };
+}
+
+const _triageTimeFormatter = typeof Intl !== 'undefined' ? new Intl.DateTimeFormat('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : null;
+
+function formatTriageArrivalTime(isoString) {
+  if (!isoString) return '--:--';
+  try {
+    const d = new Date(isoString);
+    if (isNaN(d.getTime())) return String(isoString).slice(0, 10);
+    return _triageTimeFormatter ? _triageTimeFormatter.format(d) : d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+  } catch (e) {
+    return '--:--';
+  }
+}
+
+function renderLiveTriageQueue() {
+  const triageBody = document.getElementById('adminOverviewTriageBody');
+  const triageCountEl = document.getElementById('adminOverviewTriageCount');
+  if (!triageBody) return;
+
+  const live = clinicAppState.dashboardSummary;
+  let queue = live && Array.isArray(live.triageQueue) ? live.triageQueue : null;
+
+  // Resilient fallback from live patient records if summary is pending or offline
+  if (!queue) {
+    const patients = clinicAppState.patients || [];
+    queue = patients
+      .filter(
+        (p) =>
+          p.woundCategory === 'Pending' ||
+          ['Waiting for Doctor', 'Needs Triage'].includes(p.clinicalStatus) ||
+          p.checkedInForTriage === true
+      )
+      .sort(
+        (a, b) =>
+          new Date(a.createdAt || a.day0WalkInDate || Date.now()) -
+          new Date(b.createdAt || b.day0WalkInDate || Date.now())
+      )
+      .map((p) => ({
+        id: p.patientId,
+        name: p.fullName,
+        animalType: p.animalType || 'Domestic Dog',
+        purok: p.purok || p.barangay || 'Purok 1, Kapitan Pepe',
+        arrivalTime: (p.createdAt ? new Date(p.createdAt) : new Date(p.day0WalkInDate || Date.now())).toISOString()
+      }));
+  }
+
+  if (triageCountEl) {
+    triageCountEl.textContent = `${queue.length} Waiting`;
+    triageCountEl.className = queue.length > 0 ? 'badge badge-amber' : 'badge badge-lime';
+  }
+
+  if (queue.length === 0) {
+    triageBody.innerHTML = `
+      <tr>
+        <td colspan="7" class="text-center text-muted" style="padding: 28px; text-align: center;">
+          <i class="fas fa-check-circle" style="color: #16A34A; font-size: 1.5rem; display: block; margin-bottom: 6px;"></i>
+          <strong>Triage Queue Clear</strong>
+          <span class="cell-sub">No patients currently waiting for physician triage</span>
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  triageBody.innerHTML = queue
+    .map((item) => {
+      const isDog = String(item.animalType || '').toLowerCase().includes('dog');
+      const vectorIcon = isDog ? 'fa-dog text-amber' : 'fa-cat text-purple';
+      const timeStr = formatTriageArrivalTime(item.arrivalTime);
+      const safeId = escapeHtml(item.id || '');
+      const safeName = escapeHtml(item.name || '');
+      const safeVector = escapeHtml(item.animalType || 'Domestic Dog');
+      const safePurok = escapeHtml(item.purok || 'Purok 1, Kapitan Pepe');
+
+      return `
+        <tr class="patient-row" data-patient-id="${safeId}">
+          <td class="col-id"><strong>${safeId}</strong></td>
+          <td><strong>${safeName}</strong></td>
+          <td><i class="fas ${vectorIcon}" style="margin-right: 4px;"></i><strong>${safeVector}</strong></td>
+          <td><span class="cell-sub" style="font-size: 12px;"><i class="fas fa-map-marker-alt text-muted" style="margin-right: 3px;"></i>${safePurok}</span></td>
+          <td class="num-col mono-num">${timeStr}</td>
+          <td><span class="badge badge-amber"><i class="fas fa-clock" style="margin-right: 4px;"></i>Waiting for Doctor</span></td>
+          <td style="text-align: right;">
+            <button
+              type="button"
+              class="btn btn-secondary btn-sm icon-btn btn-jump-patient-triage"
+              data-patient-id="${safeId}"
+              title="Open Doctor's Triage"
+              aria-label="Open Doctor's Triage"
+            >
+              <i class="fas fa-user-md"></i>
+            </button>
+          </td>
+        </tr>
+      `;
+    })
+    .join('');
+}
+
+function renderActionableDefaulters() {
+  const defaultersBody = document.getElementById('adminOverviewDefaultersBody');
+  const countEl = document.getElementById('adminOverviewDefaulterCount');
+  const alertBadgeEl = document.getElementById('adminOverviewDefaulterAlertBadge');
+  if (!defaultersBody) return;
+
+  const live = clinicAppState.dashboardSummary;
+  let defaulters = live && Array.isArray(live.defaulters) ? live.defaulters : null;
+
+  // Resilient fallback from patient schedules
+  if (!defaulters) {
+    const today = todayDateIso;
+    const list = [];
+    (clinicAppState.patients || []).forEach((p) => {
+      const missedList = (p.pepSchedule || []).filter((d) => {
+        if (d.status === 'Defaulter') return true;
+        if (d.status === 'Pending') {
+          const dIso = String(d.scheduledDate).split('T')[0];
+          return dIso < today;
+        }
+        return false;
+      });
+
+      if (missedList.length > 0) {
+        missedList.sort((a, b) => new Date(a.scheduledDate) - new Date(b.scheduledDate));
+        const target = missedList[0];
+        const doseIso = String(target.scheduledDate).split('T')[0];
+        const daysOverdue = Math.max(1, Math.floor((new Date(today) - new Date(doseIso)) / (24 * 60 * 60 * 1000)));
+        list.push({
+          id: p.patientId,
+          name: p.fullName,
+          phone: p.contactNumber || 'N/A',
+          missedDose: target.doseDay,
+          dueDate: doseIso,
+          daysOverdue
+        });
+      } else if (p.clinicalStatus === 'Missed Dose') {
+        list.push({
+          id: p.patientId,
+          name: p.fullName,
+          phone: p.contactNumber || 'N/A',
+          missedDose: 'Booster Dose',
+          dueDate: today,
+          daysOverdue: 1
+        });
+      }
+    });
+    list.sort((a, b) => b.daysOverdue - a.daysOverdue);
+    defaulters = list;
+  }
+
+  if (countEl) countEl.textContent = defaulters.length;
+  if (alertBadgeEl) {
+    alertBadgeEl.className = defaulters.length > 0 ? 'badge badge-red badge-pulse' : 'badge badge-lime';
+  }
+
+  if (defaulters.length === 0) {
+    defaultersBody.innerHTML = `
+      <tr>
+        <td colspan="6" class="text-center text-muted" style="padding: 28px; text-align: center;">
+          <i class="fas fa-shield-alt" style="color: #16A34A; font-size: 1.5rem; display: block; margin-bottom: 6px;"></i>
+          <strong>Zero Defaulters</strong>
+          <span class="cell-sub">100% adherence to scheduled PEP booster vaccination milestones</span>
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  defaultersBody.innerHTML = defaulters
+    .map((item) => {
+      const isCritical = item.daysOverdue >= 7;
+      const overdueBadgeClass = isCritical ? 'badge-red' : 'badge-amber';
+      const overdueIcon = isCritical ? 'fa-exclamation-circle' : 'fa-clock';
+      const overdueSuffix = isCritical ? ' (Critical)' : '';
+      const safeId = escapeHtml(item.id || '');
+      const safeName = escapeHtml(item.name || '');
+      const safePhone = escapeHtml(item.phone || 'N/A');
+      const safeDose = escapeHtml(item.missedDose || 'Booster Dose');
+      const safeDate = escapeHtml(item.dueDate || '');
+      const hasPhone = item.phone && item.phone !== 'N/A';
+
+      const phoneDisplay = hasPhone
+        ? `<a href="tel:${safePhone}" class="phone-link mono-num"><i class="fas fa-phone-alt"></i> ${safePhone}</a>`
+        : `<span class="text-muted mono-num">No phone on file</span>`;
+
+      return `
+        <tr class="patient-row" data-patient-id="${safeId}">
+          <td class="col-id"><strong>${safeId}</strong></td>
+          <td>
+            <strong>${safeName}</strong>
+            <span class="cell-sub">${phoneDisplay}</span>
+          </td>
+          <td><span class="badge badge-purple">${safeDose}</span></td>
+          <td class="num-col mono-num">${safeDate}</td>
+          <td><span class="badge ${overdueBadgeClass}"><i class="fas ${overdueIcon}" style="margin-right: 4px;"></i>${item.daysOverdue}d overdue${overdueSuffix}</span></td>
+          <td style="text-align: right;">
+            <div class="row-actions" style="justify-content: flex-end;">
+              ${hasPhone ? `
+                <a
+                  href="tel:${safePhone}"
+                  class="btn btn-secondary btn-sm icon-btn"
+                  title="Call ${safeName} (${safePhone})"
+                  aria-label="Call ${safeName}"
+                >
+                  <i class="fas fa-phone" style="color: #16A34A;"></i>
+                </a>
+              ` : ''}
+              <button
+                type="button"
+                class="btn btn-primary btn-sm btn-recall-action"
+                data-patient-id="${safeId}"
+                data-patient-name="${safeName}"
+                data-patient-phone="${safePhone}"
+                data-missed-dose="${safeDose}"
+                title="Initiate clinical recall outreach"
+              >
+                <i class="fas fa-bullhorn" style="margin-right: 4px;"></i> Recall
+              </button>
+            </div>
+          </td>
+        </tr>
+      `;
+    })
+    .join('');
+}
+
 function countHighSurgePuroks(patients) {
   const counts = {};
   (patients || []).forEach((p) => {
@@ -570,6 +924,13 @@ async function loadDashboardSummary() {
 
     // Actionable Executive KPI boxes
     setKpi('adminKpiDueToday', json.data.patientsDueToday || 0);
+    if (json.data.dueTodayBreakdown) {
+      setKpi('adminDueDay0', json.data.dueTodayBreakdown.day0 || 0);
+      setKpi('adminDueDay3', json.data.dueTodayBreakdown.day3 || 0);
+      setKpi('adminDueDay7', json.data.dueTodayBreakdown.day7 || 0);
+      setKpi('adminDueDay14', json.data.dueTodayBreakdown.day14 || 0);
+      setKpi('adminDueDay28', json.data.dueTodayBreakdown.day28 || 0);
+    }
     setKpi('adminKpiMissedDoses', json.data.missedOverdueDoses || 0);
     setKpi('adminKpiStockRunway', `${json.data.pvrvStockRunwayDays || 0} Days`);
     const runwayMeta = document.getElementById('adminKpiStockRunwayMeta');
@@ -1015,21 +1376,21 @@ function getFilteredAnalyticsContext() {
     ? clinicAppState.patients
     : [
         { patientId: 'PEP-2026-001', fullName: 'Reynaldo Sarmiento', age: 29, sex: 'Male', purok: 'Purok 1 (Centro)', animalType: 'Stray Dog', woundCategory: 'Pending', clinicalStatus: 'Waiting for Doctor', day0WalkInDate: '2026-10-22' },
-        { patientId: 'PEP-2026-002', fullName: 'Clarissa Dizon-Gomez', age: 24, sex: 'Female', purok: 'Purok 4 (Del Pilar)', animalType: 'Cat', woundCategory: 'Pending', clinicalStatus: 'Pending', day0WalkInDate: '2026-10-22' },
+        { patientId: 'PEP-2026-002', fullName: 'Clarissa Dizon-Gomez', age: 24, sex: 'Female', purok: 'Purok 4 (Del Pilar)', animalType: 'Domestic Cat', woundCategory: 'Pending', clinicalStatus: 'Pending', day0WalkInDate: '2026-10-22' },
         { patientId: 'PEP-2026-003', fullName: 'Mateo Villanueva', age: 19, sex: 'Male', purok: 'Purok 3 (Rizal St.)', animalType: 'Stray Dog', woundCategory: 'Category III', clinicalStatus: 'Due Today', day0WalkInDate: '2026-10-14' },
-        { patientId: 'PEP-2026-004', fullName: 'Rowena Macapagal-Ramos', age: 34, sex: 'Female', purok: 'Purok 2 (Mabini Ext.)', animalType: 'Dog', woundCategory: 'Category II', clinicalStatus: 'Due Today', day0WalkInDate: '2026-10-19' },
+        { patientId: 'PEP-2026-004', fullName: 'Rowena Macapagal-Ramos', age: 34, sex: 'Female', purok: 'Purok 2 (Mabini Ext.)', animalType: 'Domestic Dog', woundCategory: 'Category II', clinicalStatus: 'Due Today', day0WalkInDate: '2026-10-19' },
         { patientId: 'PEP-2026-005', fullName: 'Teresita Manalastas', age: 48, sex: 'Female', purok: 'Purok 6 (Riverbank)', animalType: 'Stray Dog', woundCategory: 'Category III', clinicalStatus: 'Due Today', day0WalkInDate: '2026-10-19' },
-        { patientId: 'PEP-2026-006', fullName: 'Jocelyn Pineda-Castro', age: 28, sex: 'Female', purok: 'Purok 5 (Maharlika)', animalType: 'Dog', woundCategory: 'Category II', clinicalStatus: 'Due Today', day0WalkInDate: '2026-10-19' },
-        { patientId: 'PEP-2026-007', fullName: 'Danilo Pangilinan Jr.', age: 12, sex: 'Male', purok: 'Purok 7 (Narra St.)', animalType: 'Dog', woundCategory: 'Category I', clinicalStatus: 'Ongoing Schedule', day0WalkInDate: '2026-10-18' },
+        { patientId: 'PEP-2026-006', fullName: 'Jocelyn Pineda-Castro', age: 28, sex: 'Female', purok: 'Purok 5 (Maharlika)', animalType: 'Domestic Dog', woundCategory: 'Category II', clinicalStatus: 'Due Today', day0WalkInDate: '2026-10-19' },
+        { patientId: 'PEP-2026-007', fullName: 'Danilo Pangilinan Jr.', age: 12, sex: 'Male', purok: 'Purok 7 (Narra St.)', animalType: 'Domestic Dog', woundCategory: 'Category I', clinicalStatus: 'Ongoing Schedule', day0WalkInDate: '2026-10-18' },
         { patientId: 'PEP-2026-008', fullName: 'Eduardo Lacson', age: 55, sex: 'Male', purok: 'Purok 1 (Centro)', animalType: 'Stray Cat', woundCategory: 'Category II', clinicalStatus: 'Ongoing Schedule', day0WalkInDate: '2026-10-18' },
         { patientId: 'PEP-2026-009', fullName: 'Marites Evangelista', age: 51, sex: 'Female', purok: 'Purok 4 (Del Pilar)', animalType: 'Stray Dog', woundCategory: 'Category III', clinicalStatus: 'Ongoing Schedule', day0WalkInDate: '2026-10-18' },
         { patientId: 'PEP-2026-010', fullName: 'Arnel Tolentino', age: 42, sex: 'Male', purok: 'Purok 6 (Riverbank)', animalType: 'Stray Dog', woundCategory: 'Category III', clinicalStatus: 'Missed Dose', day0WalkInDate: '2026-10-14' },
-        { patientId: 'PEP-2026-011', fullName: 'Benigno Solis', age: 27, sex: 'Male', purok: 'Purok 2, Kapitan Pepe', animalType: 'Dog', woundCategory: 'Pending', clinicalStatus: 'Waiting for Doctor', day0WalkInDate: '2026-10-22' },
-        { patientId: 'PEP-2026-012', fullName: 'Benigno Solis', age: 27, sex: 'Male', purok: 'Purok 2, Kapitan Pepe', animalType: 'Dog', woundCategory: 'Pending', clinicalStatus: 'Waiting for Doctor', day0WalkInDate: '2026-10-22' },
-        { patientId: 'PEP-2026-013', fullName: 'Benigno Solis', age: 27, sex: 'Male', purok: 'Purok 2, Kapitan Pepe', animalType: 'Dog', woundCategory: 'Pending', clinicalStatus: 'Waiting for Doctor', day0WalkInDate: '2026-10-22' },
-        { patientId: 'PEP-2026-014', fullName: 'Benigno Solis', age: 27, sex: 'Male', purok: 'Purok 2, Kapitan Pepe', animalType: 'Dog', woundCategory: 'Pending', clinicalStatus: 'Waiting for Doctor', day0WalkInDate: '2026-10-22' },
-        { patientId: 'PEP-2026-015', fullName: 'Benigno Solis', age: 27, sex: 'Male', purok: 'Purok 2, Kapitan Pepe', animalType: 'Dog', woundCategory: 'Pending', clinicalStatus: 'Waiting for Doctor', day0WalkInDate: '2026-10-22' },
-        { patientId: 'PEP-2026-016', fullName: 'Benigno Solis', age: 27, sex: 'Male', purok: 'Purok 2, Kapitan Pepe', animalType: 'Dog', woundCategory: 'Pending', clinicalStatus: 'Waiting for Doctor', day0WalkInDate: '2026-10-22' }
+        { patientId: 'PEP-2026-011', fullName: 'Lorena Alcantara', age: 36, sex: 'Female', purok: 'Purok 3 (Rizal St.)', animalType: 'Domestic Dog', woundCategory: 'Category II', clinicalStatus: 'Completed', day0WalkInDate: '2026-09-15' },
+        { patientId: 'PEP-2026-012', fullName: 'Gabriel Bautista', age: 8, sex: 'Male', purok: 'Purok 1 (Centro)', animalType: 'Stray Dog', woundCategory: 'Category III', clinicalStatus: 'Completed', day0WalkInDate: '2026-09-10' },
+        { patientId: 'PEP-2026-013', fullName: 'Corazon Dela Cruz', age: 62, sex: 'Female', purok: 'Purok 5 (Maharlika)', animalType: 'Domestic Cat', woundCategory: 'Category I', clinicalStatus: 'Wound Cleansing Only', day0WalkInDate: '2026-10-20' },
+        { patientId: 'PEP-2026-014', fullName: 'Ferdinand Santos', age: 45, sex: 'Male', purok: 'Purok 2 (Mabini Ext.)', animalType: 'Stray Dog', woundCategory: 'Category II', clinicalStatus: 'Ongoing Schedule', day0WalkInDate: '2026-10-16' },
+        { patientId: 'PEP-2026-015', fullName: 'Rosario Mercado', age: 31, sex: 'Female', purok: 'Purok 4 (Del Pilar)', animalType: 'Domestic Dog', woundCategory: 'Category II', clinicalStatus: 'Ongoing Schedule', day0WalkInDate: '2026-10-17' },
+        { patientId: 'PEP-2026-016', fullName: 'Benigno Solis', age: 27, sex: 'Male', purok: 'Purok 2 (Mabini Ext.)', animalType: 'Domestic Dog', woundCategory: 'Category II', clinicalStatus: 'Completed', day0WalkInDate: '2026-09-22' }
       ];
 
   const yearEl = document.getElementById('globalFilterYear');
@@ -1088,8 +1449,12 @@ function getFilteredAnalyticsContext() {
     const term = selectedAnimal.toLowerCase();
     filtered = filtered.filter((p) => {
       const anim = String(p.animalType || '').toLowerCase();
-      if (term === 'cat') return anim === 'cat' || anim.includes('cat');
-      if (term === 'dog') return anim === 'dog' || anim.includes('dog');
+      if (term === 'stray dog') return anim === 'stray dog';
+      if (term === 'domestic dog') return anim === 'domestic dog' || anim === 'dog';
+      if (term === 'dog') return anim.includes('dog');
+      if (term === 'stray cat') return anim === 'stray cat';
+      if (term === 'domestic cat') return anim === 'domestic cat' || anim === 'cat';
+      if (term === 'cat') return anim.includes('cat');
       return anim === term || anim.includes(term);
     });
   }
@@ -1171,7 +1536,7 @@ function renderPurokChart() {
       responsive: true,
       maintainAspectRatio: false,
       layout: {
-        padding: { left: 16, right: 48, top: 4, bottom: 4 }
+        padding: { left: 24, right: 48, top: 4, bottom: 4 }
       },
       scales: {
         x: {
@@ -1505,11 +1870,19 @@ function renderWeeklyTrendGraph() {
 
   const yoyRow = document.getElementById('trendYoYRow');
   if (yoyRow) {
+    const calcPill = (curr, prev) => {
+      if (prev === 0 && curr === 0) return '<span class="yoy-pill">0%</span>';
+      if (prev === 0) return `<span class="yoy-pill yoy-green">+${curr * 100}%</span>`;
+      const pct = Math.round(((curr - prev) / prev) * 100);
+      const cls = pct > 0 ? 'yoy-green' : (pct < 0 ? 'yoy-red' : '');
+      const sign = pct > 0 ? '+' : '';
+      return `<span class="yoy-pill ${cls}">${sign}${pct}%</span>`;
+    };
     yoyRow.innerHTML = `
       <span class="yoy-pill" style="opacity:0">0%</span>
-      <span class="yoy-pill yoy-green">+100%</span>
-      <span class="yoy-pill yoy-green">+100%</span>
-      <span class="yoy-pill yoy-green">+550%</span>
+      ${calcPill(intakes[1] || 0, intakes[0] || 0)}
+      ${calcPill(intakes[2] || 0, intakes[1] || 0)}
+      ${calcPill(intakes[3] || 0, intakes[2] || 0)}
     `;
   }
 }
@@ -1529,7 +1902,7 @@ function renderBiteSeverityChart() {
     'Category III - High Risk': 0,
     'Category II - Moderate Risk': 0,
     'Category I - Low Risk': 0,
-    'Pending Physician Triage': 0
+    'Pending Physician Assessment': 0
   };
 
   filteredPatients.forEach((p) => {
@@ -1537,7 +1910,7 @@ function renderBiteSeverityChart() {
     if (cat.includes('III')) counts['Category III - High Risk'] += 1;
     else if (cat.includes('II')) counts['Category II - Moderate Risk'] += 1;
     else if (cat.includes('I')) counts['Category I - Low Risk'] += 1;
-    else counts['Pending Physician Triage'] += 1;
+    else counts['Pending Physician Assessment'] += 1;
   });
 
   const activeEntries = Object.entries(counts).filter(([_, count]) => count > 0);
@@ -1565,7 +1938,7 @@ function renderBiteSeverityChart() {
       responsive: true,
       maintainAspectRatio: false,
       layout: {
-        padding: { left: 16, right: 48, top: 4, bottom: 4 }
+        padding: { left: 24, right: 48, top: 4, bottom: 4 }
       },
       scales: {
         x: {
@@ -1608,9 +1981,9 @@ function renderSeasonalHeatmap() {
   const matrix = {
     Mon: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
     Tue: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    Wed: [0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0],
-    Thu: [0, 0, 0, 0, 0, 0, 0, 0, 0, 13, 0, 0],
-    Fri: [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0],
+    Wed: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    Thu: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    Fri: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
     Sat: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
     Sun: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
   };
@@ -1648,7 +2021,7 @@ function renderSeasonalHeatmap() {
   table.innerHTML = html;
 }
 
-// 7. Horizontal Bar: Most Common Treatment Outcomes / Patient Status (Live Clinic Data)
+// 7. Horizontal Bar: PEP Regimen Progression & Adherence Funnel (Live Clinic Data)
 function renderDoseCompletionFunnel() {
   const canvas = document.getElementById('doseFunnelChart');
   if (!canvas || typeof Chart === 'undefined') return;
@@ -1657,31 +2030,50 @@ function renderDoseCompletionFunnel() {
     doseFunnelChart = null;
   }
 
-  const { filteredPatients } = getFilteredAnalyticsContext();
+  const { filteredPatients, isFiltered } = getFilteredAnalyticsContext();
 
-  const counts = {};
-  filteredPatients.forEach((p) => {
-    const st = String(p.clinicalStatus || 'Pending').trim();
-    counts[st] = (counts[st] || 0) + 1;
-  });
+  // Authentic 5-milestone progression adherence labels
+  const labels = [
+    'Day 0 (Initial)',
+    'Day 3 (Booster 1)',
+    'Day 7 (Booster 2)',
+    'Day 14 (Booster 3)',
+    'Day 28 (Booster 4)'
+  ];
 
-  const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
-  const labels = sorted.map(([s]) => s);
-  const data = sorted.map(([_, c]) => c);
-  const colors = ['#3B0D47', '#6B21A8', '#7C3AED', '#8B5CF6', '#EF4444', '#94A3B8'];
+  let data = [0, 0, 0, 0, 0];
+
+  // Dual-source: consume live backend summary when unfiltered; fallback to patient PEP schedules
+  const summary = clinicAppState.dashboardSummary;
+  if (!isFiltered && summary && Array.isArray(summary.doseCompletion) && summary.doseCompletion.length === 5) {
+    data = summary.doseCompletion.slice();
+  } else {
+    const milestoneCounts = { 'Day 0': 0, 'Day 3': 0, 'Day 7': 0, 'Day 14': 0, 'Day 28': 0 };
+    (filteredPatients || []).forEach((p) => {
+      (p.pepSchedule || []).forEach((d) => {
+        if (d.status === 'Fulfilled' && milestoneCounts[d.doseDay] !== undefined) {
+          milestoneCounts[d.doseDay] += 1;
+        }
+      });
+    });
+    data = ['Day 0', 'Day 3', 'Day 7', 'Day 14', 'Day 28'].map((day) => milestoneCounts[day]);
+  }
+
+  // Clinical adherence gradient (dark violet to lavender)
+  const colors = ['#3B0D47', '#581C87', '#7C3AED', '#9333EA', '#A855F7'];
 
   const ctxFunnel = canvas.getContext('2d');
   doseFunnelChart = new Chart(ctxFunnel, {
     type: 'bar',
     data: {
-      labels: labels.length ? labels : ['No Data'],
+      labels: labels,
       datasets: [
         {
-          label: 'Patients',
-          data: data.length ? data : [0],
-          backgroundColor: colors.slice(0, labels.length),
-          borderRadius: 3,
-          barThickness: 14
+          label: 'Completed Doses',
+          data: data,
+          backgroundColor: colors,
+          borderRadius: 4,
+          barThickness: 16
         }
       ]
     },
@@ -1690,7 +2082,7 @@ function renderDoseCompletionFunnel() {
       responsive: true,
       maintainAspectRatio: false,
       layout: {
-        padding: { left: 16, right: 48, top: 4, bottom: 4 }
+        padding: { left: 24, right: 48, top: 4, bottom: 4 }
       },
       scales: {
         x: {
@@ -1711,7 +2103,8 @@ function renderDoseCompletionFunnel() {
         legend: { display: false },
         tooltip: {
           callbacks: {
-            label: (ctx) => ` Count: ${Number(ctx.raw).toLocaleString()} patients`
+            title: (items) => items[0]?.label || '',
+            label: (ctx) => ` Completed Adherence: ${Number(ctx.raw).toLocaleString()} patients`
           }
         }
       }
@@ -1824,7 +2217,8 @@ function renderPatientMixChart() {
 // visual epidemiological analytics and the system audit trail.
 // All Chart.js instances for this view are (re)initialized here.
 function renderMasterDashboard() {
-  const patients = clinicAppState.patients || [];
+  const { isFiltered, filteredPatients } = getFilteredAnalyticsContext();
+  const patients = isFiltered ? filteredPatients : (clinicAppState.patients || []);
   const inventory = clinicAppState.inventory || [];
   const auditLogs = clinicAppState.auditLogs || [];
   const staff = clinicAppState.staffAccounts || [];
@@ -1835,79 +2229,212 @@ function renderMasterDashboard() {
       .filter((i) => i.vaccineType === type)
       .reduce((acc, i) => acc + Number(i.currentStock || 0), 0);
 
-  // Live actionable metrics from /api/dashboard/summary take precedence.
-  const live = clinicAppState.dashboardSummary;
+  // Live actionable metrics from /api/dashboard/summary take precedence when unfiltered.
+  const live = isFiltered ? null : clinicAppState.dashboardSummary;
   const dueToday = live ? live.patientsDueToday : countDueToday(patients);
   const missed = live ? live.missedOverdueDoses : countMissedOverdue(patients);
-  const runway = live ? live.pvrvStockRunwayDays : computePvrvRunway(inventory);
   const surge = live ? live.highSurgePuroks : countHighSurgePuroks(patients);
+
+  // Compute Multi-Vaccine Health
+  const health = computeMultiVaccineHealth(inventory, clinicAppState.patients || [], clinicAppState.dashboardSummary);
 
   const dueEl = document.getElementById('adminKpiDueToday');
   if (dueEl) dueEl.textContent = dueToday;
+
+  // Real-time Day 0-28 milestone breakdown rendering
+  const breakdown = (live && live.dueTodayBreakdown)
+    ? live.dueTodayBreakdown
+    : getDueTodayBreakdown(patients);
+
+  const d0El = document.getElementById('adminDueDay0');
+  if (d0El) d0El.textContent = breakdown.day0 || 0;
+  const d3El = document.getElementById('adminDueDay3');
+  if (d3El) d3El.textContent = breakdown.day3 || 0;
+  const d7El = document.getElementById('adminDueDay7');
+  if (d7El) d7El.textContent = breakdown.day7 || 0;
+  const d14El = document.getElementById('adminDueDay14');
+  if (d14El) d14El.textContent = breakdown.day14 || 0;
+  const d28El = document.getElementById('adminDueDay28');
+  if (d28El) d28El.textContent = breakdown.day28 || 0;
+
   const missedEl = document.getElementById('adminKpiMissedDoses');
   if (missedEl) missedEl.textContent = missed;
+
+  // --- Executive Card 4: Multi-Vaccine Runway Display ---
   const runwayEl = document.getElementById('adminKpiStockRunway');
-  if (runwayEl) runwayEl.textContent = `${runway} Days`;
+  if (runwayEl) runwayEl.textContent = `${health.pvrv.runwayDays} Days`;
+
   const runwayMeta = document.getElementById('adminKpiStockRunwayMeta');
   if (runwayMeta) {
-    const vialCount = live ? live.pvrvStock : (inventory || []).filter((i) => i.vaccineType === 'anti-rabies').reduce((s, i) => s + Number(i.currentStock || 0), 0);
-    runwayMeta.textContent = `${vialCount} vials on hand`;
+    runwayMeta.textContent = `${health.pvrv.stock} vials on hand`;
   }
+
+  const pvrvBurnEl = document.getElementById('adminKpiPvrvBurnRate');
+  if (pvrvBurnEl) pvrvBurnEl.textContent = `${health.pvrv.dailyConsumption}/day`;
+  const pvrvRateMeta = document.getElementById('adminKpiPvrvRateMeta');
+  if (pvrvRateMeta) pvrvRateMeta.textContent = `${health.pvrv.dailyConsumption} v/d`;
+
+  // Anti-Tetanus Sub-Pill
+  const ttRunwayEl = document.getElementById('adminKpiTtRunway');
+  if (ttRunwayEl) ttRunwayEl.textContent = `${health.antiTetanus.runwayDays}d`;
+  const ttMetaEl = document.getElementById('adminKpiTtMeta');
+  if (ttMetaEl) ttMetaEl.textContent = `(${health.antiTetanus.stock}v • ${health.antiTetanus.dailyConsumption}/d)`;
+
+  // ERIG Sub-Pill
+  const erigRunwayEl = document.getElementById('adminKpiErigRunway');
+  if (erigRunwayEl) erigRunwayEl.textContent = `${health.erig.runwayDays}d`;
+  const erigMetaEl = document.getElementById('adminKpiErigMeta');
+  if (erigMetaEl) erigMetaEl.textContent = `(${health.erig.stock}v • ${health.erig.dailyConsumption}/d)`;
+
+  const erigChip = document.getElementById('adminKpiErigChip');
+  if (erigChip) {
+    if (health.erig.isCriticalRestock) erigChip.classList.add('chip-alert');
+    else erigChip.classList.remove('chip-alert');
+  }
+
+  // Stock status badge on Card 4
+  const stockBadge = document.getElementById('adminKpiStockStatusBadge');
+  if (stockBadge) {
+    if (health.erig.isCriticalRestock || health.pvrv.isCriticalRestock) {
+      stockBadge.className = 'badge badge-sm badge-red';
+      stockBadge.textContent = health.erig.isCriticalRestock ? 'ERIG Alert' : 'PVRV Alert';
+    } else if (health.erig.status === 'Reorder Soon' || health.pvrv.status === 'Reorder Soon') {
+      stockBadge.className = 'badge badge-sm badge-amber';
+      stockBadge.textContent = 'Reorder Soon';
+    } else {
+      stockBadge.className = 'badge badge-sm badge-lime';
+      stockBadge.textContent = 'Optimal';
+    }
+  }
+
   const surgeEl = document.getElementById('adminKpiSurgePuroks');
   if (surgeEl) surgeEl.textContent = surge;
   const activeEl = document.getElementById('adminKpiActivePep');
   if (activeEl) {
-    const activeCount = live && live.activePatients != null ? live.activePatients : (patients.length || 10);
+    const activeCount = live && live.activePatients != null ? live.activePatients : patients.length;
     activeEl.textContent = activeCount;
   }
+
+  // --- Prominent Restock Warning Banners ---
+  const restockBanner = document.getElementById('adminStockAlertsBanner');
+  const restockMsg = document.getElementById('adminStockAlertMessage');
+  const restockCountBadge = document.getElementById('adminStockAlertCountBadge');
+  if (restockBanner && restockMsg) {
+    const criticalBiologics = [];
+    if (health.erig.isCriticalRestock) criticalBiologics.push({ name: 'ERIG (Equirab)', ...health.erig });
+    if (health.pvrv.isCriticalRestock) criticalBiologics.push({ name: 'PVRV Anti-Rabies', ...health.pvrv });
+    if (health.antiTetanus.isCriticalRestock) criticalBiologics.push({ name: 'Anti-Tetanus (Tetavax)', ...health.antiTetanus });
+
+    if (criticalBiologics.length > 0) {
+      restockBanner.classList.remove('hidden');
+      if (restockCountBadge) {
+        restockCountBadge.textContent = `${criticalBiologics.length} Biologic${criticalBiologics.length > 1 ? 's' : ''} Critical`;
+      }
+      restockMsg.innerHTML = criticalBiologics
+        .map(
+          (b) => `
+          <div>
+            <strong>${b.name}</strong> inventory is critically depleted: <strong>${b.stock} vials remaining</strong> 
+            (&le; ${b.safetyThreshold} threshold) with only <strong>${b.runwayDays} days of runway</strong> remaining 
+            at current consumption (<strong>${b.dailyConsumption} vials/day</strong>). Urgent restock required for bite victims.
+          </div>
+        `
+        )
+        .join('');
+    } else {
+      restockBanner.classList.add('hidden');
+    }
+  }
+
+  // --- Proactive FEFO Approaching Expiration Alert Banner ---
+  const fefoBanner = document.getElementById('adminFefoAlertBanner');
+  const fefoMsg = document.getElementById('adminFefoAlertMessage');
+  const fefoCountBadge = document.getElementById('adminFefoAlertCountBadge');
+  if (fefoBanner && fefoMsg) {
+    const expiringBatches = health.expiringBatches || [];
+    if (expiringBatches.length > 0) {
+      fefoBanner.classList.remove('hidden');
+      if (fefoCountBadge) {
+        fefoCountBadge.textContent = `${expiringBatches.length} Batch${expiringBatches.length > 1 ? 'es' : ''} Expiring Soon`;
+      }
+      fefoMsg.innerHTML = expiringBatches
+        .map(
+          (batch) => `
+          <div>
+            <strong>${batch.vaccineType} Lot ${batch.batchNumber}</strong> ${batch.brandName ? `(${batch.brandName})` : ''} 
+            expires on <strong>${batch.expirationDate}</strong> (in <strong>${batch.daysUntilExpiry} days</strong>) &bull; 
+            <strong>${batch.currentStock || batch.stock || 7} vials remaining</strong>. Enforce <em>First-Expiry, First-Out (FEFO)</em> dispensing priority.
+          </div>
+        `
+        )
+        .join('');
+    } else {
+      fefoBanner.classList.add('hidden');
+    }
+  }
+
+  // Render Milestone 2 Operational Workflows on Clinic Overview
+  renderLiveTriageQueue();
+  renderActionableDefaulters();
 
   // Dynamic filter tab counters
   updateTabCounts(patients, 'adminRegistryFilterTabs');
 
   const auditBody = document.getElementById('adminOverviewAuditBody');
-  auditBody.innerHTML = auditLogs
-    .slice(0, 50)
-    .map((log) => {
-      const timeStr = new Date(log.timestamp).toISOString().replace('T', ' ').slice(0, 16);
-      return `
-        <tr>
-          <td class="num-col mono-num">${timeStr}</td>
-          <td><span class="badge badge-purple">${log.actorRole}</span></td>
-          <td><strong>${log.actionType}</strong></td>
-          <td>${log.description}</td>
-        </tr>
-      `;
-    })
-    .join('');
+  if (auditBody) {
+    auditBody.innerHTML = auditLogs
+      .slice(0, 50)
+      .map((log) => {
+        const timeStr = new Date(log.timestamp).toISOString().replace('T', ' ').slice(0, 16);
+        return `
+          <tr>
+            <td class="num-col mono-num">${timeStr}</td>
+            <td><span class="badge badge-purple">${log.actorRole}</span></td>
+            <td><strong>${log.actionType}</strong></td>
+            <td>${log.description}</td>
+          </tr>
+        `;
+      })
+      .join('');
+  }
 
   const overviewStockBody = document.getElementById('adminOverviewStockBody');
-  overviewStockBody.innerHTML = inventory
-    .map((item) => {
-      const expStr = String(item.expirationDate).split('T')[0];
-      const isExpired = expStr < todayDateIso;
-      const threshold = item.lowStockThreshold || 10;
-      const isLow = item.currentStock <= threshold;
+  if (overviewStockBody) {
+    overviewStockBody.innerHTML = inventory
+      .map((item) => {
+        const expStr = String(item.expirationDate).split('T')[0];
+        const isExpired = expStr < todayDateIso;
+        const threshold = item.lowStockThreshold || 10;
+        const isLow = item.currentStock <= threshold;
 
-      let badgeClass = isLow ? 'badge-red' : 'badge-lime';
-      let statusText = isLow ? 'Low Stock' : 'In Stock';
-      if (isExpired) {
-        badgeClass = 'badge-red badge-expired';
-        statusText = 'EXPIRED';
-      }
+        const diffMs = new Date(expStr) - new Date(todayDateIso);
+        const daysUntilExp = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+        const isExpiringSoon = !isExpired && daysUntilExp > 0 && daysUntilExp <= 60;
 
-      return `
-        <tr>
-          <td>
-            <strong>${item.vaccineType}</strong>
-            <span class="cell-sub">${item.brandName} • <span class="mono-num">${item.batchNumber}</span></span>
-          </td>
-          <td class="num-col tabular-num"><strong class="${isExpired || isLow ? 'text-red' : ''}">${item.currentStock}</strong></td>
-          <td class="num-col mono-num ${isExpired ? 'text-red' : ''}">${expStr}</td>
-          <td><span class="badge ${badgeClass}">${statusText}</span></td>
-        </tr>
-      `;
-    })
-    .join('');
+        let badgeClass = isLow ? 'badge-red' : 'badge-lime';
+        let statusText = isLow ? 'Low Stock' : 'In Stock';
+        if (isExpired) {
+          badgeClass = 'badge-red badge-expired';
+          statusText = 'EXPIRED';
+        } else if (isExpiringSoon && !isLow) {
+          badgeClass = 'badge-amber';
+          statusText = `Expiring (${daysUntilExp}d)`;
+        }
+
+        return `
+          <tr>
+            <td>
+              <strong>${item.vaccineType}</strong>
+              <span class="cell-sub">${item.brandName} • <span class="mono-num">${item.batchNumber}</span></span>
+            </td>
+            <td class="num-col tabular-num"><strong class="${isExpired || isLow ? 'text-red' : ''}">${item.currentStock}</strong></td>
+            <td class="num-col mono-num ${isExpired ? 'text-red' : (isExpiringSoon ? 'text-amber' : '')}">${expStr}</td>
+            <td><span class="badge ${badgeClass}">${statusText}</span></td>
+          </tr>
+        `;
+      })
+      .join('');
+  }
 
   if (forecast) {
     document.getElementById('forecastVialsTableBody').innerHTML = (
@@ -2606,6 +3133,34 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (pid && dday) openDoseModal(pid, pname, dday);
     }
   });
+
+  const overviewTriageBody = document.getElementById('adminOverviewTriageBody');
+  if (overviewTriageBody) {
+    overviewTriageBody.addEventListener('click', (e) => {
+      const jumpBtn = e.target.closest('.btn-jump-patient-triage');
+      const row = e.target.closest('tr.patient-row');
+      const pid = jumpBtn ? jumpBtn.getAttribute('data-patient-id') : (row ? row.getAttribute('data-patient-id') : null);
+      if (pid) {
+        clinicAppState.selectedPatientId = pid;
+        switchClinicalView('viewPhysTriage');
+        selectPatient(pid, true);
+      }
+    });
+  }
+
+  const overviewDefaultersBody = document.getElementById('adminOverviewDefaultersBody');
+  if (overviewDefaultersBody) {
+    overviewDefaultersBody.addEventListener('click', (e) => {
+      const recallBtn = e.target.closest('.btn-recall-action');
+      if (recallBtn) {
+        const pid = recallBtn.getAttribute('data-patient-id');
+        const pname = recallBtn.getAttribute('data-patient-name') || pid;
+        const phone = recallBtn.getAttribute('data-patient-phone') || 'N/A';
+        const missedDose = recallBtn.getAttribute('data-missed-dose') || 'Booster Dose';
+        showToast(`Recall outreach logged for ${pname} (${missedDose} overdue). Contact: ${phone}`);
+      }
+    });
+  }
 
   document.getElementById('loginStep1Form').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -3749,6 +4304,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     } else {
       showToast('Filters cleared: Viewing All records');
     }
+    renderMasterDashboard();
     renderMasterDashboardCharts();
   }
 
@@ -3767,6 +4323,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (el) el.value = 'All';
       });
       showToast('Reset view: Showing all baseline registry data.');
+      renderMasterDashboard();
       renderMasterDashboardCharts();
     });
   });

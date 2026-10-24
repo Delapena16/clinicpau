@@ -642,7 +642,7 @@ const updatePatientDemographics = async (req, res) => {
   }
 };
 
-// Actionable KPI metrics for the Clinic Overview (MongoDB aggregations / counts).
+// Actionable KPI metrics for the Clinic Overview (Dual-Path: MongoDB aggregations with seamless In-Memory fallback).
 const getDashboardSummary = async (req, res) => {
   try {
     const todayStart = new Date();
@@ -650,158 +650,615 @@ const getDashboardSummary = async (req, res) => {
     const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
 
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+    const sixtyDaysAhead = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000);
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     const sevenDaysAgoStart = new Date(sevenDaysAgo);
     sevenDaysAgoStart.setUTCHours(0, 0, 0, 0);
 
-    const [dueTodayAgg, missedAgg, pvrvAgg, consumedAgg, purokAgg, doseCompletionAgg, peakTrafficAgg, newPatientsAgg, returningAgg] = await Promise.all([
-      // Card 1: Patients with a pending dose scheduled exactly today.
-      Patient.aggregate([
-        { $unwind: '$pepSchedule' },
-        {
-          $match: {
-            'pepSchedule.status': 'Pending',
-            'pepSchedule.scheduledDate': { $gte: todayStart, $lt: todayEnd }
-          }
-        },
-        { $group: { _id: null, total: { $addToSet: '$_id' } } },
-        { $project: { total: { $size: '$total' } } }
-      ]),
-      // Card 2: Missed / overdue doses (defaulter or pending past due, or flagged Missed).
-      Patient.aggregate([
-        {
-          $match: {
+    const isConnected = mongoose.connection && mongoose.connection.readyState === 1;
+
+    // ------------------------------------------------------------------------
+    // PATH A: MongoDB Live Database Available
+    // ------------------------------------------------------------------------
+    if (isConnected) {
+      try {
+        const [
+          activePatientsCount,
+          dueTodayAgg,
+          triageDocs,
+          overdueDocs,
+          doseCompletionAgg,
+          inventoryDocs,
+          consumptionAgg,
+          purokAgg,
+          woundCatAgg,
+          vectorAgg,
+          peakTrafficAgg,
+          newPatientsAgg,
+          returningAgg
+        ] = await Promise.all([
+          // 1. Active PEP Patients (undergoing treatment: not Cat I and not completed/cleansing)
+          Patient.countDocuments({
+            woundCategory: { $ne: 'Category I' },
+            clinicalStatus: { $nin: ['Completed', 'Wound Cleansing Only'] }
+          }),
+
+          // 2. Booster Doses Due Today Breakdown
+          Patient.aggregate([
+            { $unwind: '$pepSchedule' },
+            {
+              $match: {
+                'pepSchedule.status': 'Pending',
+                'pepSchedule.scheduledDate': { $gte: todayStart, $lt: todayEnd }
+              }
+            },
+            {
+              $group: {
+                _id: '$pepSchedule.doseDay',
+                patients: { $addToSet: '$_id' }
+              }
+            },
+            {
+              $project: {
+                doseDay: '$_id',
+                count: { $size: '$patients' }
+              }
+            }
+          ]),
+
+          // 3. Triage Queue (Waiting for Doctor, FIFO)
+          Patient.find({
+            $or: [
+              { woundCategory: 'Pending' },
+              { clinicalStatus: { $in: ['Waiting for Doctor', 'Needs Triage'] } }
+            ]
+          })
+            .sort({ createdAt: 1, day0WalkInDate: 1 })
+            .select('patientId fullName animalType purok barangay createdAt day0WalkInDate')
+            .lean(),
+
+          // 4. Defaulters / Overdue Patients
+          Patient.find({
             $or: [
               { clinicalStatus: 'Missed Dose' },
               { 'pepSchedule.status': 'Defaulter' },
-              { 'pepSchedule': { $elemMatch: { status: 'Pending', scheduledDate: { $lt: todayStart } } } }
+              {
+                pepSchedule: {
+                  $elemMatch: {
+                    status: 'Pending',
+                    scheduledDate: { $lt: todayStart }
+                  }
+                }
+              }
             ]
+          })
+            .select('patientId fullName contactNumber pepSchedule clinicalStatus')
+            .lean(),
+
+          // 5. Dose Completion Funnel
+          Patient.aggregate([
+            { $unwind: '$pepSchedule' },
+            {
+              $match: {
+                'pepSchedule.status': 'Fulfilled',
+                'pepSchedule.doseDay': { $in: ['Day 0', 'Day 3', 'Day 7', 'Day 14', 'Day 28'] }
+              }
+            },
+            {
+              $group: {
+                _id: '$pepSchedule.doseDay',
+                distinctPatients: { $addToSet: '$_id' }
+              }
+            },
+            {
+              $project: {
+                doseDay: '$_id',
+                count: { $size: '$distinctPatients' }
+              }
+            }
+          ]),
+
+          // 6. Vaccine Inventory Batches
+          Inventory.find({}).sort({ expirationDate: 1 }).lean(),
+
+          // 7. Trailing 30-Day Vaccine Consumption across all biologics
+          Patient.aggregate([
+            { $unwind: '$pepSchedule' },
+            {
+              $match: {
+                'pepSchedule.status': 'Fulfilled',
+                $expr: {
+                  $gte: [
+                    { $ifNull: ['$pepSchedule.dateProcessed', '$pepSchedule.scheduledDate'] },
+                    thirtyDaysAgo
+                  ]
+                }
+              }
+            },
+            {
+              $group: {
+                _id: {
+                  $switch: {
+                    branches: [
+                      { case: { $eq: ['$pepSchedule.vaccineTypeUsed', 'anti-tetanus'] }, then: 'anti-tetanus' },
+                      { case: { $eq: ['$pepSchedule.vaccineTypeUsed', 'ERIG'] }, then: 'ERIG' }
+                    ],
+                    default: 'anti-rabies'
+                  }
+                },
+                consumedCount: { $sum: 1 }
+              }
+            }
+          ]),
+
+          // 8. Purok Outbreak Aggregation
+          Patient.aggregate([
+            { $group: { _id: '$purok', count: { $sum: 1 } } }
+          ]),
+
+          // 9. WHO Wound Category Distribution
+          Patient.aggregate([
+            { $group: { _id: '$woundCategory', count: { $sum: 1 } } }
+          ]),
+
+          // 10. Animal Vector Distribution
+          Patient.aggregate([
+            { $group: { _id: '$animalType', count: { $sum: 1 } } }
+          ]),
+
+          // 11. Peak Traffic by Day of Week
+          Patient.aggregate([
+            { $group: { _id: { $dayOfWeek: '$day0WalkInDate' }, count: { $sum: 1 } } }
+          ]),
+
+          // 12. New Patients Last 7 Days
+          Patient.aggregate([
+            { $match: { day0WalkInDate: { $gte: sevenDaysAgoStart } } },
+            { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$day0WalkInDate' } }, count: { $sum: 1 } } }
+          ]),
+
+          // 13. Returning Patients Last 7 Days
+          Patient.aggregate([
+            { $unwind: '$pepSchedule' },
+            {
+              $match: {
+                'pepSchedule.status': 'Fulfilled',
+                'pepSchedule.doseDay': { $ne: 'Day 0' },
+                'pepSchedule.dateProcessed': { $gte: sevenDaysAgoStart }
+              }
+            },
+            { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$pepSchedule.dateProcessed' } }, count: { $sum: 1 } } }
+          ])
+        ]);
+
+        // --- Format Due Today Breakdown ---
+        const dueTodayBreakdown = { day0: 0, day3: 0, day7: 0, day14: 0, day28: 0 };
+        const DOSE_MAP = { 'Day 0': 'day0', 'Day 3': 'day3', 'Day 7': 'day7', 'Day 14': 'day14', 'Day 28': 'day28' };
+        for (const item of dueTodayAgg || []) {
+          const key = DOSE_MAP[item.doseDay];
+          if (key && dueTodayBreakdown[key] !== undefined) {
+            dueTodayBreakdown[key] = Number(item.count || 0);
           }
-        },
-        { $count: 'total' }
-      ]),
-      // Card 3: Total anti-rabies (PVRV) vials on hand.
-      Inventory.aggregate([
-        { $match: { vaccineType: 'anti-rabies' } },
-        { $group: { _id: null, total: { $sum: '$currentStock' } } }
-      ]),
-      // Card 3 (runway): anti-rabies vials consumed in the last 30 days.
-      Patient.aggregate([
-        { $unwind: '$pepSchedule' },
-        {
-          $match: {
-            'pepSchedule.status': 'Fulfilled',
-            'pepSchedule.vaccineTypeUsed': { $in: ['anti-rabies', null] },
-            'pepSchedule.dateProcessed': { $gte: thirtyDaysAgo }
+        }
+        const patientsDueToday = Object.values(dueTodayBreakdown).reduce((a, b) => a + b, 0);
+
+        // --- Format Triage Queue ---
+        const triageQueue = (triageDocs || []).map((p) => ({
+          id: p.patientId,
+          name: p.fullName,
+          animalType: p.animalType || 'Domestic Dog',
+          purok: p.purok || p.barangay || 'Purok 1, Kapitan Pepe',
+          arrivalTime: p.createdAt
+            ? new Date(p.createdAt).toISOString()
+            : (p.day0WalkInDate ? new Date(p.day0WalkInDate).toISOString() : new Date().toISOString())
+        }));
+
+        // --- Format Defaulters List ---
+        const defaulters = [];
+        for (const p of overdueDocs || []) {
+          const missedList = (p.pepSchedule || []).filter((d) => {
+            if (d.status === 'Defaulter') return true;
+            if (d.status === 'Pending') {
+              const dDate = new Date(d.scheduledDate);
+              return dDate < todayStart;
+            }
+            return false;
+          });
+
+          if (missedList.length > 0) {
+            missedList.sort((a, b) => new Date(a.scheduledDate) - new Date(b.scheduledDate));
+            const targetDose = missedList[0];
+            const doseDate = new Date(targetDose.scheduledDate);
+            const dueDate = doseDate.toISOString().split('T')[0];
+            const diffTime = todayStart.getTime() - doseDate.getTime();
+            const daysOverdue = Math.max(1, Math.floor(diffTime / (24 * 60 * 60 * 1000)));
+
+            defaulters.push({
+              id: p.patientId,
+              name: p.fullName,
+              phone: p.contactNumber || 'N/A',
+              missedDose: targetDose.doseDay,
+              dueDate,
+              daysOverdue
+            });
+          } else if (p.clinicalStatus === 'Missed Dose') {
+            defaulters.push({
+              id: p.patientId,
+              name: p.fullName,
+              phone: p.contactNumber || 'N/A',
+              missedDose: 'Booster Dose',
+              dueDate: todayStart.toISOString().split('T')[0],
+              daysOverdue: 1
+            });
           }
-        },
-        { $group: { _id: null, total: { $sum: 1 } } }
-      ]),
-      // Card 4: Puroks whose incident count exceeds the mean by 50% (high surge).
-      Patient.aggregate([
-        { $group: { _id: '$purok', count: { $sum: 1 } } }
-      ]),
-      // Dose completion funnel: distinct patients who completed each milestone
-      // dose over the last 90 days.
-      Patient.aggregate([
-        { $unwind: '$pepSchedule' },
-        {
-          $match: {
-            'pepSchedule.status': 'Fulfilled',
-            $expr: {
-              $gte: [
-                { $ifNull: ['$pepSchedule.dateProcessed', '$pepSchedule.scheduledDate'] },
-                ninetyDaysAgo
-              ]
+        }
+        defaulters.sort((a, b) => b.daysOverdue - a.daysOverdue);
+        const missedDoses = defaulters.length;
+
+        // --- Format Dose Completion Funnel ---
+        const doseCompletionMap = {};
+        for (const d of doseCompletionAgg || []) {
+          doseCompletionMap[d.doseDay] = Number(d.count || 0);
+        }
+        const doseCompletion = ['Day 0', 'Day 3', 'Day 7', 'Day 14', 'Day 28'].map(
+          (day) => doseCompletionMap[day] || 0
+        );
+
+        // --- Format Inventory Health & Multi-Vaccine Runway ---
+        const stockByType = { 'anti-rabies': 0, 'anti-tetanus': 0, ERIG: 0 };
+        const expiringBatches = [];
+
+        for (const item of inventoryDocs || []) {
+          if (stockByType[item.vaccineType] !== undefined) {
+            stockByType[item.vaccineType] += Number(item.currentStock || 0);
+          }
+          if (item.currentStock > 0 && item.expirationDate) {
+            const expDate = new Date(item.expirationDate);
+            if (expDate <= sixtyDaysAhead) {
+              const daysUntilExpiry = Math.max(0, Math.ceil((expDate.getTime() - Date.now()) / (24 * 60 * 60 * 1000)));
+              expiringBatches.push({
+                vaccineType: item.vaccineType === 'anti-rabies' ? 'PVRV' : item.vaccineType,
+                batchNumber: item.batchNumber,
+                expirationDate: expDate.toISOString().split('T')[0],
+                daysUntilExpiry
+              });
             }
           }
-        },
-        { $group: { _id: '$pepSchedule.doseDay', patients: { $addToSet: '$_id' } } },
-        { $project: { doseDay: '$_id', count: { $size: '$patients' } } }
-      ]),
-      // Peak clinic traffic by day of week (1=Sun ... 7=Sat).
-      Patient.aggregate([
-        { $group: { _id: { $dayOfWeek: '$day0WalkInDate' }, count: { $sum: 1 } } }
-      ]),
-      // New patients per day (last 7 days).
-      Patient.aggregate([
-        { $match: { day0WalkInDate: { $gte: sevenDaysAgoStart } } },
-        { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$day0WalkInDate' } }, count: { $sum: 1 } } }
-      ]),
-      // Returning patients per day (follow-up doses administered, last 7 days).
-      Patient.aggregate([
-        { $unwind: '$pepSchedule' },
-        {
-          $match: {
-            'pepSchedule.status': 'Fulfilled',
-            'pepSchedule.doseDay': { $ne: 'Day 0' },
-            'pepSchedule.dateProcessed': { $gte: sevenDaysAgoStart }
+        }
+        expiringBatches.sort((a, b) => a.daysUntilExpiry - b.daysUntilExpiry);
+
+        const consumptionMap = {};
+        for (const c of consumptionAgg || []) {
+          consumptionMap[c._id] = Number(c.consumedCount || 0);
+        }
+
+        const buildVialHealth = (vType, safetyThreshold, fallbackDailyRate) => {
+          const stock = stockByType[vType] || 0;
+          const consumed30 = consumptionMap[vType] || 0;
+          const liveDaily = consumed30 > 0 ? consumed30 / 30 : fallbackDailyRate;
+          const dailyConsumption = Number(liveDaily.toFixed(1));
+          const runwayDays = dailyConsumption > 0 ? Math.max(0, Math.floor(stock / dailyConsumption)) : 999;
+          const lotsOfType = (inventoryDocs || []).filter((l) => l.vaccineType === vType);
+          const hasCriticalBatch = lotsOfType.some(
+            (l) => Number(l.currentStock || 0) <= Number(l.lowStockThreshold || safetyThreshold)
+          );
+          let status = 'Optimal';
+          if (stock <= 0 || stock <= safetyThreshold || runwayDays <= 10 || hasCriticalBatch) {
+            status = 'Critical Restock';
+          } else if (runwayDays <= 21 || stock <= safetyThreshold * 1.5) {
+            status = 'Reorder Soon';
           }
-        },
-        { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$pepSchedule.dateProcessed' } }, count: { $sum: 1 } } }
-      ])
-    ]);
+          return {
+            stock,
+            dailyConsumption,
+            runwayDays,
+            safetyThreshold,
+            status,
+            isCriticalRestock: status === 'Critical Restock'
+          };
+        };
 
-    const patientsDueToday = dueTodayAgg.length ? Number(dueTodayAgg[0].total || 0) : 0;
-    const missedOverdueDoses = missedAgg.length ? Number(missedAgg[0].total || 0) : 0;
-    const pvrvStock = pvrvAgg.length && Number(pvrvAgg[0].total || 0) > 0 ? Number(pvrvAgg[0].total || 0) : 129;
+        const inventoryHealth = {
+          pvrv: buildVialHealth('anti-rabies', 30, 4.2),
+          antiTetanus: buildVialHealth('anti-tetanus', 15, 1.5),
+          erig: buildVialHealth('ERIG', 10, 0.8)
+        };
 
-    // PVRV Stock Runway: Days Left = Math.floor(Total PVRV Vials / (30-Day Demand / 30)).
-    // The 30-Day Demand comes from the forecast summary (projected30DayDemand for anti-rabies).
-    let projected30DayDemand = 180;
-    try {
-      const forecastPath = path.join(__dirname, '..', 'public', 'data', 'forecast_summary.json');
-      if (fs.existsSync(forecastPath)) {
-        const forecastData = JSON.parse(fs.readFileSync(forecastPath, 'utf-8'));
-        const vialForecast = (forecastData.vialForecasts || []).find(
-          (vf) => vf.vaccineType === 'anti-rabies'
-        );
-        if (vialForecast && Number(vialForecast.projected30DayDemand || 0) > 0) {
-          projected30DayDemand = Number(vialForecast.projected30DayDemand || 0);
+        // --- Format Surveillance Maps ---
+        const purokOutbreaks = {};
+        const purokCounts = [];
+        for (const p of purokAgg || []) {
+          if (p._id) {
+            purokOutbreaks[p._id] = Number(p.count || 0);
+            purokCounts.push(Number(p.count || 0));
+          }
+        }
+        const meanPurok = purokCounts.length ? purokCounts.reduce((a, b) => a + b, 0) / purokCounts.length : 0;
+        const highSurgePuroks = purokCounts.filter((c) => c > meanPurok).length;
+
+        const woundCategories = { 'Category I': 0, 'Category II': 0, 'Category III': 0, Pending: 0 };
+        for (const w of woundCatAgg || []) {
+          if (w._id && woundCategories[w._id] !== undefined) {
+            woundCategories[w._id] = Number(w.count || 0);
+          }
+        }
+
+        const vectorDistribution = { 'Domestic Dog': 0, 'Stray Dog': 0, 'Domestic Cat': 0, 'Stray Cat': 0 };
+        for (const v of vectorAgg || []) {
+          let vec = v._id;
+          if (vec === 'Dog') vec = 'Domestic Dog';
+          if (vec === 'Cat') vec = 'Domestic Cat';
+          if (vec && vectorDistribution[vec] !== undefined) {
+            vectorDistribution[vec] += Number(v.count || 0);
+          }
+        }
+
+        // --- Format Traffic & Mix ---
+        const peakTrafficByDay = [0, 0, 0, 0, 0, 0, 0];
+        for (const r of peakTrafficAgg || []) {
+          const idx = Number(r._id) - 1;
+          if (idx >= 0 && idx < 7) peakTrafficByDay[idx] = Number(r.count || 0);
+        }
+
+        const newMap = {};
+        for (const r of newPatientsAgg || []) newMap[r._id] = Number(r.count || 0);
+        const returningMap = {};
+        for (const r of returningAgg || []) returningMap[r._id] = Number(r.count || 0);
+
+        const mixLabels = [];
+        const mixNew = [];
+        const mixReturning = [];
+        for (let i = 6; i >= 0; i--) {
+          const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
+          const dateStr = d.toISOString().split('T')[0];
+          const dayName = d.toLocaleDateString('en-US', { weekday: 'short' });
+          mixLabels.push(dayName);
+          mixNew.push(newMap[dateStr] || 0);
+          mixReturning.push(returningMap[dateStr] || 0);
+        }
+        const patientMix = { labels: mixLabels, new: mixNew, returning: mixReturning };
+
+        return res.status(200).json({
+          success: true,
+          message: 'Dashboard summary retrieved.',
+          data: {
+            activePatients: activePatientsCount,
+            patientsDueToday,
+            dueTodayBreakdown,
+            missedDoses,
+            defaulters,
+            triageQueue,
+            inventory: inventoryHealth,
+            expiringBatches,
+            doseCompletion,
+            purokOutbreaks,
+            woundCategories,
+            vectorDistribution,
+
+            // Backwards-compatible legacy keys
+            missedOverdueDoses: missedDoses,
+            pvrvStock: inventoryHealth.pvrv.stock,
+            pvrvStockRunwayDays: inventoryHealth.pvrv.runwayDays,
+            highSurgePuroks,
+            peakTrafficByDay,
+            patientMix,
+            erigStock: inventoryHealth.erig.stock,
+            activeStaff: null,
+            generatedAt: new Date().toISOString()
+          }
+        });
+      } catch (mongoQueryErr) {
+        console.warn('MongoDB query failed, falling back to in-memory store:', mongoQueryErr.message);
+      }
+    }
+
+    // ------------------------------------------------------------------------
+    // PATH B: Resilient In-Memory Fallback (Offline Mode or DB Query Error)
+    // ------------------------------------------------------------------------
+    const { inMemoryStore } = require('../config/inMemoryStore');
+    const patients = inMemoryStore.patients || [];
+    const inventory = inMemoryStore.inventory || [];
+    const todayIso = todayStart.toISOString().split('T')[0];
+
+    // 1. Active PEP Patients (undergoing treatment)
+    const activePatientsCount = patients.filter(
+      (p) => p.woundCategory !== 'Category I' && !['Completed', 'Wound Cleansing Only'].includes(p.clinicalStatus)
+    ).length;
+
+    // 2. Booster Doses Due Today Breakdown
+    const dueTodayBreakdown = { day0: 0, day3: 0, day7: 0, day14: 0, day28: 0 };
+    const DOSE_MAP = { 'Day 0': 'day0', 'Day 3': 'day3', 'Day 7': 'day7', 'Day 14': 'day14', 'Day 28': 'day28' };
+    const distinctDueSet = new Set();
+    patients.forEach((p) => {
+      (p.pepSchedule || []).forEach((d) => {
+        if (d.status === 'Pending') {
+          const dIso = d.scheduledDate instanceof Date ? d.scheduledDate.toISOString().split('T')[0] : String(d.scheduledDate).split('T')[0];
+          if (dIso === todayIso) {
+            const k = DOSE_MAP[d.doseDay];
+            if (k && dueTodayBreakdown[k] !== undefined) {
+              dueTodayBreakdown[k] += 1;
+              distinctDueSet.add(p.patientId || String(p._id));
+            }
+          }
+        }
+      });
+    });
+    const patientsDueToday = distinctDueSet.size;
+
+    // 3. Triage Queue (Waiting for Doctor, FIFO)
+    const triageQueue = patients
+      .filter((p) => p.woundCategory === 'Pending' || ['Waiting for Doctor', 'Needs Triage'].includes(p.clinicalStatus))
+      .sort((a, b) => new Date(a.createdAt || a.day0WalkInDate || Date.now()) - new Date(b.createdAt || b.day0WalkInDate || Date.now()))
+      .map((p) => ({
+        id: p.patientId,
+        name: p.fullName,
+        animalType: p.animalType || 'Domestic Dog',
+        purok: p.purok || p.barangay || 'Purok 1, Kapitan Pepe',
+        arrivalTime: (p.createdAt ? new Date(p.createdAt) : new Date(p.day0WalkInDate || Date.now())).toISOString()
+      }));
+
+    // 4. Defaulters / Overdue Patients (sorted by daysOverdue descending)
+    const defaulters = [];
+    patients.forEach((p) => {
+      const missedList = (p.pepSchedule || []).filter((d) => {
+        if (d.status === 'Defaulter') return true;
+        if (d.status === 'Pending') {
+          const dDate = new Date(d.scheduledDate);
+          return dDate < todayStart;
+        }
+        return false;
+      });
+
+      if (missedList.length > 0) {
+        missedList.sort((a, b) => new Date(a.scheduledDate) - new Date(b.scheduledDate));
+        const target = missedList[0];
+        const doseDate = new Date(target.scheduledDate);
+        const daysOverdue = Math.max(1, Math.floor((todayStart.getTime() - doseDate.getTime()) / (24 * 60 * 60 * 1000)));
+        defaulters.push({
+          id: p.patientId,
+          name: p.fullName,
+          phone: p.contactNumber || 'N/A',
+          missedDose: target.doseDay,
+          dueDate: doseDate.toISOString().split('T')[0],
+          daysOverdue
+        });
+      } else if (p.clinicalStatus === 'Missed Dose') {
+        defaulters.push({
+          id: p.patientId,
+          name: p.fullName,
+          phone: p.contactNumber || 'N/A',
+          missedDose: 'Booster Dose',
+          dueDate: todayIso,
+          daysOverdue: 1
+        });
+      }
+    });
+    defaulters.sort((a, b) => b.daysOverdue - a.daysOverdue);
+    const missedDoses = defaulters.length;
+
+    // 5. Dose Completion Funnel
+    const patientDoseSets = { 'Day 0': new Set(), 'Day 3': new Set(), 'Day 7': new Set(), 'Day 14': new Set(), 'Day 28': new Set() };
+    patients.forEach((p) => {
+      (p.pepSchedule || []).forEach((d) => {
+        if (d.status === 'Fulfilled' && patientDoseSets[d.doseDay]) {
+          patientDoseSets[d.doseDay].add(p.patientId || String(p._id));
+        }
+      });
+    });
+    const doseCompletion = ['Day 0', 'Day 3', 'Day 7', 'Day 14', 'Day 28'].map((day) => patientDoseSets[day].size);
+
+    // 6. Inventory & FEFO Expiring Batches
+    const stockByType = { 'anti-rabies': 0, 'anti-tetanus': 0, ERIG: 0 };
+    const expiringBatches = [];
+    inventory.forEach((item) => {
+      if (stockByType[item.vaccineType] !== undefined) {
+        stockByType[item.vaccineType] += Number(item.currentStock || 0);
+      }
+      if (item.currentStock > 0 && item.expirationDate) {
+        const expDate = new Date(item.expirationDate);
+        if (expDate <= sixtyDaysAhead) {
+          const daysUntilExpiry = Math.max(0, Math.ceil((expDate.getTime() - Date.now()) / (24 * 60 * 60 * 1000)));
+          expiringBatches.push({
+            vaccineType: item.vaccineType === 'anti-rabies' ? 'PVRV' : item.vaccineType,
+            batchNumber: item.batchNumber,
+            expirationDate: expDate.toISOString().split('T')[0],
+            daysUntilExpiry
+          });
         }
       }
-    } catch (forecastErr) {
-      console.warn('Could not read forecast summary for runway calc:', forecastErr.message);
-    }
+    });
+    expiringBatches.sort((a, b) => a.daysUntilExpiry - b.daysUntilExpiry);
 
-    // Average Daily Consumption (ADC) = 30-Day Demand / 30
-    const averageDailyConsumption =
-      projected30DayDemand > 0 ? projected30DayDemand / 30 : 6.0;
-    const pvrvStockRunwayDays = Math.max(0, Math.floor(pvrvStock / averageDailyConsumption));
+    // 7. 30-Day Live Consumption
+    const consumptionCounts = { 'anti-rabies': 0, 'anti-tetanus': 0, ERIG: 0 };
+    patients.forEach((p) => {
+      (p.pepSchedule || []).forEach((d) => {
+        if (d.status === 'Fulfilled') {
+          const pDate = new Date(d.dateProcessed || d.scheduledDate);
+          if (pDate >= thirtyDaysAgo) {
+            let vType = d.vaccineTypeUsed || 'anti-rabies';
+            if (vType === 'PVRV') vType = 'anti-rabies';
+            if (consumptionCounts[vType] !== undefined) {
+              consumptionCounts[vType] += 1;
+            } else {
+              consumptionCounts['anti-rabies'] += 1;
+            }
+          }
+        }
+      });
+    });
 
-    // High surge: puroks whose incident count exceeds the per-purok mean
-    // (i.e. above the normal baseline). Uses MongoDB aggregation so the
-    // metric stays live with the patient collection.
-    const purokCounts = (purokAgg || []).map((r) => Number(r.count || 0));
-    const mean = purokCounts.length
-      ? purokCounts.reduce((a, b) => a + b, 0) / purokCounts.length
-      : 0;
-    const highSurgePuroks = purokAgg.length
-      ? purokAgg.filter((r) => Number(r.count || 0) > mean).length
-      : 0;
+    const buildVialHealth = (vType, safetyThreshold, fallbackDailyRate) => {
+      const stock = stockByType[vType] || 0;
+      const consumed30 = consumptionCounts[vType] || 0;
+      const liveDaily = consumed30 > 0 ? consumed30 / 30 : fallbackDailyRate;
+      const dailyConsumption = Number(liveDaily.toFixed(1));
+      const runwayDays = dailyConsumption > 0 ? Math.max(0, Math.floor(stock / dailyConsumption)) : 999;
+      const lotsOfType = inventory.filter((l) => l.vaccineType === vType);
+      const hasCriticalBatch = lotsOfType.some(
+        (l) => Number(l.currentStock || 0) <= Number(l.lowStockThreshold || safetyThreshold)
+      );
+      let status = 'Optimal';
+      if (stock <= 0 || stock <= safetyThreshold || runwayDays <= 10 || hasCriticalBatch) {
+        status = 'Critical Restock';
+      } else if (runwayDays <= 21 || stock <= safetyThreshold * 1.5) {
+        status = 'Reorder Soon';
+      }
+      return {
+        stock,
+        dailyConsumption,
+        runwayDays,
+        safetyThreshold,
+        status,
+        isCriticalRestock: status === 'Critical Restock'
+      };
+    };
 
-    // Dose completion funnel data: [Day 0, Day 3, Day 7, Day 14, Day 28]
-    const doseCompletionMap = {};
-    for (const d of doseCompletionAgg || []) {
-      doseCompletionMap[d.doseDay] = Number(d.count || 0);
-    }
-    const doseCompletion = ['Day 0', 'Day 3', 'Day 7', 'Day 14', 'Day 28'].map(
-      (day) => doseCompletionMap[day] || 0
-    );
+    const inventoryHealth = {
+      pvrv: buildVialHealth('anti-rabies', 30, 4.2),
+      antiTetanus: buildVialHealth('anti-tetanus', 15, 1.5),
+      erig: buildVialHealth('ERIG', 10, 0.8)
+    };
 
-    // Peak clinic traffic by day of week (Sun=0 .. Sat=6).
+    // 8. Surveillance Maps
+    const purokOutbreaks = {};
+    patients.forEach((p) => {
+      const pk = p.purok || p.barangay || 'Purok 1, Kapitan Pepe';
+      purokOutbreaks[pk] = (purokOutbreaks[pk] || 0) + 1;
+    });
+    const pCounts = Object.values(purokOutbreaks);
+    const meanPurok = pCounts.length ? pCounts.reduce((a, b) => a + b, 0) / pCounts.length : 0;
+    const highSurgePuroks = pCounts.filter((c) => c > meanPurok).length;
+
+    const woundCategories = { 'Category I': 0, 'Category II': 0, 'Category III': 0, Pending: 0 };
+    patients.forEach((p) => {
+      const wc = p.woundCategory || 'Pending';
+      if (woundCategories[wc] !== undefined) {
+        woundCategories[wc] += 1;
+      }
+    });
+
+    const vectorDistribution = { 'Domestic Dog': 0, 'Stray Dog': 0, 'Domestic Cat': 0, 'Stray Cat': 0 };
+    patients.forEach((p) => {
+      let vec = p.animalType || 'Domestic Dog';
+      if (vec === 'Dog') vec = 'Domestic Dog';
+      if (vec === 'Cat') vec = 'Domestic Cat';
+      if (vectorDistribution[vec] !== undefined) {
+        vectorDistribution[vec] += 1;
+      }
+    });
+
+    // 9. Peak Traffic & Patient Mix
     const peakTrafficByDay = [0, 0, 0, 0, 0, 0, 0];
-    for (const r of peakTrafficAgg || []) {
-      const idx = Number(r._id) - 1;
-      if (idx >= 0 && idx < 7) peakTrafficByDay[idx] = Number(r.count || 0);
-    }
-
-    // Daily patient mix (New vs. Returning) over the last 7 days.
-    const newMap = {};
-    for (const r of newPatientsAgg || []) newMap[r._id] = Number(r.count || 0);
-    const returningMap = {};
-    for (const r of returningAgg || []) returningMap[r._id] = Number(r.count || 0);
+    patients.forEach((p) => {
+      if (p.day0WalkInDate) {
+        const d = new Date(p.day0WalkInDate);
+        const dayOfWeek = d.getUTCDay();
+        if (dayOfWeek >= 0 && dayOfWeek < 7) {
+          peakTrafficByDay[dayOfWeek] += 1;
+        }
+      }
+    });
 
     const mixLabels = [];
     const mixNew = [];
@@ -811,26 +1268,54 @@ const getDashboardSummary = async (req, res) => {
       const dateStr = d.toISOString().split('T')[0];
       const dayName = d.toLocaleDateString('en-US', { weekday: 'short' });
       mixLabels.push(dayName);
-      mixNew.push(newMap[dateStr] || 0);
-      mixReturning.push(returningMap[dateStr] || 0);
+
+      const newCount = patients.filter((p) => {
+        if (!p.day0WalkInDate) return false;
+        const walkIso = p.day0WalkInDate instanceof Date ? p.day0WalkInDate.toISOString().split('T')[0] : String(p.day0WalkInDate).split('T')[0];
+        return walkIso === dateStr;
+      }).length;
+      mixNew.push(newCount);
+
+      let retCount = 0;
+      patients.forEach((p) => {
+        (p.pepSchedule || []).forEach((dose) => {
+          if (dose.status === 'Fulfilled' && dose.doseDay !== 'Day 0') {
+            const procIso = dose.dateProcessed
+              ? (dose.dateProcessed instanceof Date ? dose.dateProcessed.toISOString().split('T')[0] : String(dose.dateProcessed).split('T')[0])
+              : null;
+            if (procIso === dateStr) retCount += 1;
+          }
+        });
+      });
+      mixReturning.push(retCount);
     }
     const patientMix = { labels: mixLabels, new: mixNew, returning: mixReturning };
 
     return res.status(200).json({
       success: true,
-      message: 'Dashboard summary retrieved.',
+      message: 'Dashboard summary retrieved (in-memory store fallback).',
       data: {
+        activePatients: activePatientsCount,
         patientsDueToday,
-        missedOverdueDoses,
-        pvrvStock,
-        pvrvStockRunwayDays,
-        highSurgePuroks,
+        dueTodayBreakdown,
+        missedDoses,
+        defaulters,
+        triageQueue,
+        inventory: inventoryHealth,
+        expiringBatches,
         doseCompletion,
+        purokOutbreaks,
+        woundCategories,
+        vectorDistribution,
+
+        // Backwards-compatible legacy keys
+        missedOverdueDoses: missedDoses,
+        pvrvStock: inventoryHealth.pvrv.stock,
+        pvrvStockRunwayDays: inventoryHealth.pvrv.runwayDays,
+        highSurgePuroks,
         peakTrafficByDay,
         patientMix,
-        // Backwards-compatible keys (still reported for clients that read them).
-        activePatients: patientsDueToday,
-        erigStock: null,
+        erigStock: inventoryHealth.erig.stock,
         activeStaff: null,
         generatedAt: new Date().toISOString()
       }

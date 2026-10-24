@@ -10,7 +10,7 @@
     href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700&display=swap"
     rel="stylesheet"
   />
-  <link rel="stylesheet" href="/css/styles.css?v=10" />
+  <link rel="stylesheet" href="/css/styles.css?v=11" />
   <link
     rel="stylesheet"
     href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
@@ -186,7 +186,6 @@
               <option value="Stray Dog">Stray Dog</option>
               <option value="Cat">Cat</option>
               <option value="Stray Cat">Stray Cat</option>
-              <option value="Other">Other</option>
             </select>
           </div>
           <span class="filter-pipe">|</span>
@@ -389,7 +388,6 @@
                     <option value="Stray Dog">Stray Dog</option>
                     <option value="Cat">Domestic Cat</option>
                     <option value="Stray Cat">Stray Cat</option>
-                    <option value="Other">Other Animal</option>
                   </select>
                 </div>
                 <div class="form-group">
@@ -700,6 +698,60 @@
             </div>
           </div>
 
+          <!-- Clinical Restock & FEFO Expiration Alert Group -->
+          <div id="adminStockAlertsContainer" class="admin-alerts-container">
+            <!-- 1. Critical Restock Warning Banner -->
+            <div id="adminStockAlertsBanner" class="clinic-alert-banner banner-danger hidden" role="alert">
+              <div class="alert-icon-col">
+                <i class="fas fa-exclamation-triangle alert-icon-pulse" aria-hidden="true"></i>
+              </div>
+              <div class="alert-content-col">
+                <div class="alert-title-row">
+                  <strong class="alert-title">CRITICAL VACCINE RESTOCK REQUIRED</strong>
+                  <span class="badge badge-red badge-sm" id="adminStockAlertCountBadge">1 Biologic Depleted</span>
+                </div>
+                <div class="alert-message" id="adminStockAlertMessage">
+                  <!-- Dynamically rendered -->
+                </div>
+                <div class="alert-actions-row">
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-danger alert-action-btn"
+                    id="adminBannerRestockBtn"
+                    data-jump-nav="viewAdminInventory"
+                    data-focus-input="invBrandName"
+                  >
+                    <i class="fas fa-truck-loading" aria-hidden="true"></i> Restock Depleted Biologics
+                  </button>
+                  <button type="button" class="btn btn-sm btn-outline-danger alert-action-btn" data-jump-nav="viewAdminInventory">
+                    Inspect Batch Inventory
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- 2. Proactive FEFO Expiration Warning Banner (30–60 Days) -->
+            <div id="adminFefoAlertBanner" class="clinic-alert-banner banner-warning hidden" role="alert">
+              <div class="alert-icon-col">
+                <i class="fas fa-hourglass-half text-amber" aria-hidden="true"></i>
+              </div>
+              <div class="alert-content-col">
+                <div class="alert-title-row">
+                  <strong class="alert-title">PROACTIVE FEFO EXPIRY WARNING (30–60 DAYS)</strong>
+                  <span class="badge badge-amber badge-sm" id="adminFefoAlertCountBadge">1 Batch Approaching Expiry</span>
+                </div>
+                <div class="alert-message" id="adminFefoAlertMessage">
+                  <!-- Dynamically rendered -->
+                </div>
+                <div class="alert-actions-row">
+                  <button type="button" class="btn btn-sm btn-outline-warning alert-action-btn" data-jump-nav="viewAdminInventory">
+                    <i class="fas fa-boxes" aria-hidden="true"></i> Prioritize FEFO Dispensing
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- Row 1: Executive KPIs -->
           <div class="kpi-grid superadmin-cards-wrapper">
             <!-- 1. SuperAdmin Workspace navigation panel -->
@@ -718,13 +770,19 @@
             </div>
 
             <!-- 2. Patients Due Today -->
-            <div class="kpi-card kpi-clickable" data-jump-nav="viewAdminRegistry">
-              <span class="kpi-label">Patients Due Today</span>
+            <div class="kpi-card kpi-clickable" data-jump-nav="viewAdminRegistry" title="View Patients Due Today in Registry">
+              <div class="kpi-header-row">
+                <span class="kpi-label">Patients Due Today</span>
+                <span class="badge badge-purple" id="adminDueTodayLiveBadge" title="Live schedule tracking">Live</span>
+              </div>
               <div class="kpi-content-split">
-                <strong class="kpi-value tabular-num" id="adminKpiDueToday">7</strong>
-                <div class="kpi-trend-stack">
-                  <span class="kpi-trend-val text-green">+12.9% &#9650;</span>
-                  <span class="kpi-trend-sub">YoY</span>
+                <strong class="kpi-value tabular-num" id="adminKpiDueToday">0</strong>
+                <div class="kpi-milestone-pills" id="adminDueMilestoneBreakdown" title="Breakdown by dose milestone">
+                  <span class="kpi-milestone-pill" id="adminDueDay0Pill" title="Day 0 (Initial Walk-in)">d0:<strong id="adminDueDay0">0</strong></span>
+                  <span class="kpi-milestone-pill" id="adminDueDay3Pill" title="Day 3 Booster">d3:<strong id="adminDueDay3">0</strong></span>
+                  <span class="kpi-milestone-pill" id="adminDueDay7Pill" title="Day 7 Booster">d7:<strong id="adminDueDay7">0</strong></span>
+                  <span class="kpi-milestone-pill" id="adminDueDay14Pill" title="Day 14 Booster">d14:<strong id="adminDueDay14">0</strong></span>
+                  <span class="kpi-milestone-pill" id="adminDueDay28Pill" title="Day 28 Booster">d28:<strong id="adminDueDay28">0</strong></span>
                 </div>
               </div>
             </div>
@@ -746,13 +804,41 @@
               </div>
             </div>
 
-            <!-- 4. PVRV Stock Runway -->
-            <div class="kpi-card kpi-clickable" data-jump-nav="viewAdminInventory">
-              <span class="kpi-label">PVRV Stock Runway</span>
-              <strong class="kpi-value tabular-num" id="adminKpiStockRunway">21 Days</strong>
+            <!-- 4. Multi-Vaccine Stock Health & Runway Card -->
+            <div class="kpi-card kpi-clickable kpi-card-stock-runway" id="adminKpiStockCard" data-jump-nav="viewAdminInventory" title="Click to inspect all vaccine batches and restock">
+              <div class="kpi-header-row">
+                <span class="kpi-label">Vaccine Stock Runway</span>
+                <span class="badge badge-sm badge-red" id="adminKpiStockStatusBadge" title="Critical safety threshold breached">ERIG Alert</span>
+              </div>
+              <div class="kpi-content-split">
+                <div>
+                  <strong class="kpi-value tabular-num" id="adminKpiStockRunway">28 Days</strong>
+                  <span class="kpi-sub-label">PVRV Anti-Rabies</span>
+                </div>
+                <div class="kpi-trend-stack text-right">
+                  <span class="kpi-burn-rate text-purple mono-num" id="adminKpiPvrvBurnRate">4.2/day</span>
+                  <span class="kpi-trend-sub">Live Burn</span>
+                </div>
+              </div>
               <div class="kpi-meta-split">
-                <span class="kpi-meta-left" id="adminKpiStockRunwayMeta">130 vials on hand</span>
-                <span class="kpi-meta-right text-red">-3.0% &#9660;</span>
+                <span class="kpi-meta-left" id="adminKpiStockRunwayMeta">126 vials on hand</span>
+                <span class="kpi-meta-right text-purple mono-num" id="adminKpiPvrvRateMeta">4.2 v/d</span>
+              </div>
+
+              <!-- Multi-Vaccine Biologic Breakdown Strip -->
+              <div class="kpi-biologic-strip" id="adminKpiBiologicStrip">
+                <div class="biologic-chip biologic-chip-tt" id="adminKpiTtChip" title="Anti-Tetanus (Tetavax): 36 vials on hand, 24 days runway at 1.5 vials/day">
+                  <span class="chip-dot dot-lime"></span>
+                  <span class="chip-name">TT:</span>
+                  <strong class="chip-runway mono-num" id="adminKpiTtRunway">24d</strong>
+                  <span class="chip-meta mono-num" id="adminKpiTtMeta">(36v • 1.5/d)</span>
+                </div>
+                <div class="biologic-chip biologic-chip-erig chip-alert" id="adminKpiErigChip" title="ERIG (Equirab): 7 vials on hand, 8 days runway at 0.8 vials/day (Critical Restock Alert!)">
+                  <span class="chip-dot dot-red"></span>
+                  <span class="chip-name text-red">ERIG:</span>
+                  <strong class="chip-runway text-red mono-num" id="adminKpiErigRunway">8d</strong>
+                  <span class="chip-meta text-red mono-num" id="adminKpiErigMeta">(7v • 0.8/d)</span>
+                </div>
               </div>
             </div>
 
@@ -774,6 +860,93 @@
               <span class="kpi-meta">Hotspot areas</span>
             </div>
           </div>
+
+          <!-- Row 1.5: Active Operational Workflow & Real-Time Queues -->
+          <div class="grid-2-col-equal mb-16 operational-workflow-section" id="adminOperationalWorkflowRow">
+            <!-- Left Card: Live Triage Queue -->
+            <div class="panel-card triage-queue-card">
+              <div class="panel-header">
+                <div>
+                  <h3 class="panel-title">
+                    <i class="fas fa-stethoscope" style="color: var(--brand-purple); margin-right: 6px;"></i>
+                    Live Triage Queue
+                  </h3>
+                  <span class="cell-sub">Patients checked-in and waiting for physician triage</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span class="badge badge-amber" id="adminOverviewTriageCount">0 Waiting</span>
+                  <button
+                    type="button"
+                    class="btn btn-outline-sm"
+                    data-jump-nav="viewPhysTriage"
+                    title="Open Doctor's Triage View"
+                  >
+                    Open Triage <i class="fas fa-arrow-right" style="margin-left: 4px;"></i>
+                  </button>
+                </div>
+              </div>
+              <div class="table-container table-scroll-container" style="max-height: 280px;">
+                <table class="clinical-table">
+                  <thead>
+                    <tr>
+                      <th class="col-id">Patient ID</th>
+                      <th>Patient Name</th>
+                      <th>Animal Vector</th>
+                      <th>Purok / Community</th>
+                      <th class="num-col">Arrival</th>
+                      <th>Status</th>
+                      <th style="text-align: right;">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="adminOverviewTriageBody"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Right Card: Actionable Defaulter Tracking & Clinical Recall -->
+            <div class="panel-card defaulter-recall-card">
+              <div class="panel-header">
+                <div>
+                  <h3 class="panel-title">
+                    <i class="fas fa-exclamation-triangle" style="color: var(--brand-red); margin-right: 6px;"></i>
+                    Defaulter Tracking &amp; Clinical Recall
+                  </h3>
+                  <span class="cell-sub">Missed booster doses requiring immediate recall outreach</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span class="badge badge-red" id="adminOverviewDefaulterAlertBadge">
+                    <i class="fas fa-bell" style="margin-right: 4px;"></i>
+                    <span id="adminOverviewDefaulterCount">0</span> Overdue
+                  </span>
+                  <button
+                    type="button"
+                    class="btn btn-outline-sm text-red"
+                    data-jump-nav="viewAdminRegistry"
+                    data-focus-input="adminRegistrySearchInput"
+                    title="View Defaulters in Registry"
+                  >
+                    View Registry <i class="fas fa-arrow-right" style="margin-left: 4px;"></i>
+                  </button>
+                </div>
+              </div>
+              <div class="table-container table-scroll-container" style="max-height: 280px;">
+                <table class="clinical-table">
+                  <thead>
+                    <tr>
+                      <th class="col-id">Patient ID</th>
+                      <th>Patient &amp; Contact</th>
+                      <th>Missed Dose</th>
+                      <th class="num-col">Due Date</th>
+                      <th>Days Overdue</th>
+                      <th style="text-align: right;">Recall Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="adminOverviewDefaultersBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <!-- End Row 1.5: Active Operational Workflow -->
 
           <!-- Row 2: Visual Clinical Analytics (3-Column Layout Matching Reference Screenshot) -->
           <div class="analytics-dashboard-3col">
@@ -905,21 +1078,21 @@
                 </div>
               </div>
 
-              <!-- Card 2: Most Common Treatment Outcomes -->
+              <!-- Card 2: PEP Regimen Progression & Adherence Funnel -->
               <div class="panel-card chart-card analytics-card">
                 <div class="analytics-card-header">
                   <div class="header-left">
                     <button type="button" class="btn-crumb-back" data-reset="outcomes" title="Reset filter">
                       <i class="fas fa-undo"></i> Back
                     </button>
-                    <h3 class="panel-title">Most Common Treatment Outcomes</h3>
+                    <h3 class="panel-title">PEP Regimen Progression &amp; Adherence Funnel</h3>
                   </div>
-                  <button type="button" class="btn-card-info" data-info="outcomes" title="Treatment regimen compliance and outcomes">
+                  <button type="button" class="btn-card-info" data-info="outcomes" title="Treatment regimen compliance and milestone adherence">
                     <i class="far fa-question-circle"></i>
                   </button>
                 </div>
                 <div class="chart-container chart-container-hbar">
-                  <canvas id="doseFunnelChart" aria-label="Most Common Treatment Outcomes"></canvas>
+                  <canvas id="doseFunnelChart" aria-label="PEP Regimen Progression &amp; Adherence Funnel"></canvas>
                 </div>
               </div>
             </div>
@@ -1380,6 +1553,6 @@
     </div>
   </div>
 
-  <script src="/js/app.js?v=37"></script>
+  <script src="/js/app.js?v=38"></script>
 </body>
 </html>
