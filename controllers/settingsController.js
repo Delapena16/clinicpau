@@ -1,10 +1,11 @@
+const mongoose = require('mongoose');
 const SystemSettings = require('../models/SystemSettings');
 const { logActivity, AUDIT_EVENTS } = require('../utils/logger');
 
 const SETTINGS_UPDATED = 'SETTINGS_UPDATED';
 
 // Ensures a default settings document exists (lazy init).
-const ensureSettings = async () => {
+const ensureSettings = async () => { if (mongoose.connection.readyState !== 1) return { inactivityTimeoutMinutes: 15 };
   let settings = await SystemSettings.findOne();
   if (!settings) {
     settings = await SystemSettings.create({ inactivityTimeoutMinutes: 15 });

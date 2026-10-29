@@ -18,8 +18,7 @@ const verifyAuthenticationToken = async (req, res, next) => {
       });
     }
 
-    const jwtSecret = process.env.JWT_SECRET || 'dr_pau_pep_secret_key_2026';
-    const decoded = jwt.verify(token, jwtSecret);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     if (!decoded.mfaVerified) {
       return res.status(401).json({

@@ -14,7 +14,11 @@ const {
   verifyUnmask,
   googleLogin,
   verifyTotp,
-  regenerateTotpQr
+  regenerateTotpQr,
+  forgotPassword,
+  verifyResetOtp,
+  resetPassword,
+  markAccountNotificationsRead
 } = require('../controllers/authController');
 const { verifyAuthenticationToken } = require('../middleware/authMiddleware');
 
@@ -41,9 +45,9 @@ const verifyOtpValidators = [
   handleValidationErrors
 ];
 
-const loginRateLimiter = rateLimit({
+const isDevAuth = process.env.NODE_ENV !== 'production'; const loginRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 5,
+  max: 5000, skip: () => isDevAuth,
   skipSuccessfulRequests: true,
   standardHeaders: true,
   legacyHeaders: false,
@@ -57,7 +61,7 @@ const loginRateLimiter = rateLimit({
 // 2. ADD AN OTP SPAM PROTECTOR (Rate Limiter)
 const sendOtpRateLimiter = rateLimit({
   windowMs: 5 * 60 * 1000, // 5 minutes
-  max: 3, // Limit each IP to 3 OTP requests per 5 minutes
+  max: 5000, skip: () => isDevAuth, // Limit each IP to 3 OTP requests per 5 minutes
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -116,10 +120,15 @@ router.post('/verify-otp', verifyOtpValidators, verifyMfaOtpStepTwo);
 
 router.post('/logout', logoutCurrentSession);
 router.get('/me', verifyAuthenticationToken, getCurrentUserProfile);
+router.post('/notifications/read', verifyAuthenticationToken, markAccountNotificationsRead);
 router.post('/verify-password', verifyAuthenticationToken, verifyPassword);
 router.post('/verify-unmask', verifyAuthenticationToken, verifyUnmask);
 router.post('/google', googleLogin);
 router.post('/verify-totp', verifyTotp);
 router.post('/regenerate-totp-qr', regenerateTotpQr);
+
+router.post('/forgot-password', forgotPassword);
+router.post('/verify-reset-otp', verifyResetOtp);
+router.post('/reset-password', resetPassword);
 
 module.exports = router;

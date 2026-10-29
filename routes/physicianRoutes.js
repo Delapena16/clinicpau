@@ -53,8 +53,8 @@ router.use(verifyAuthenticationToken);
 router.get('/patients', authorizeRoles('Physician', 'SuperAdmin'), getPatientsAndDailyQueue);
 router.get('/queue', authorizeRoles('Physician', 'SuperAdmin'), getPatientsAndDailyQueue);
 
-router.get('/inventory', authorizeRoles('Physician', 'SuperAdmin'), getPhysicianReadOnlyInventory);
-router.get('/batches', authorizeRoles('Physician', 'SuperAdmin'), getPhysicianReadOnlyInventory);
+router.get('/inventory', authorizeRoles('Physician', 'SuperAdmin', 'Receptionist'), getPhysicianReadOnlyInventory);
+router.get('/batches', authorizeRoles('Physician', 'SuperAdmin', 'Receptionist'), getPhysicianReadOnlyInventory);
 
 router.post('/patients/:patientId/assess', authorizeRoles('Physician'), triageValidators, saveWoundAssessment);
 router.post('/triage/:patientId', authorizeRoles('Physician'), triageValidators, saveWoundAssessment);
@@ -64,7 +64,7 @@ router.post('/log-dose/:patientId', authorizeRoles('Physician'), logDoseValidato
 
 router.patch(
   '/patients/:patientId/schedule',
-  authorizeRoles('Physician'),
+  authorizeRoles('Physician', 'SuperAdmin'),
   [
     body('doseDay')
       .isIn(['Day 0', 'Day 3', 'Day 7', 'Day 14', 'Day 28'])

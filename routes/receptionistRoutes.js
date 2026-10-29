@@ -64,7 +64,7 @@ router.post('/checkin/:patientId', authorizeRoles('Receptionist'), checkInReturn
 
 router.patch(
   '/patients/:patientId/schedule',
-  authorizeRoles('Physician'),
+  authorizeRoles('Receptionist', 'Physician', 'SuperAdmin'),
   [
     body('doseDay')
       .isIn(['Day 0', 'Day 3', 'Day 7', 'Day 14', 'Day 28'])

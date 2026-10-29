@@ -13,36 +13,6 @@ const AuditLog = require('../models/AuditLog');
 // Initialize Google OAuth2 client
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
-// Demo account fallback map if database is not seeded.
-// The canonical password matches the "Demo Sign-In" buttons in the UI (public/js/app.js),
-// so the same credential works for login AND for the export re-authentication challenge.
-const demoAccounts = {
-  'admin@drpauclinic.ph': {
-    fullName: 'Dr. Pau Admin (SuperAdmin)',
-    role: 'SuperAdmin',
-    password: 'Admin@12345',
-    aliases: ['admin123']
-  },
-  'physician@drpauclinic.ph': {
-    fullName: 'Dr. Pau Physician',
-    role: 'Physician',
-    password: 'Physician@12345',
-    aliases: ['doc123']
-  },
-  'receptionist@drpauclinic.ph': {
-    fullName: 'Dr. Pau Receptionist',
-    role: 'Receptionist',
-    password: 'Reception@12345',
-    aliases: ['recep123']
-  }
-};
-
-// Returns true when the supplied password matches the demo account (canonical or alias).
-const matchesDemoPassword = (demo, password) => {
-  if (!demo || !password) return false;
-  return demo.password === password || (demo.aliases || []).includes(password);
-};
-
 // Dispatch OTP to terminal console, log file, and user's email via Nodemailer
 const dispatchMfaOtpToTerminalAndSmtp = async (
   staffEmail,
@@ -160,30 +130,18 @@ const initiateLoginStepOne = async (req, res) => {
 
     let staffUser = null;
     try {
-      staffUser = await User.findOne({ email }).select('+passwordHash +mfaOtp +mfaOtpExpires');
+      if (mongoose.connection.readyState === 1) {
+        staffUser = await User.findOne({ email }).select('+passwordHash +mfaOtp +mfaOtpExpires');
+      }
     } catch (dbErr) {
       console.warn('MongoDB query error:', dbErr.message);
     }
 
-    // Fallback: If user not in MongoDB, check demo accounts and auto-create user in DB
     if (!staffUser) {
-      const demo = demoAccounts[email];
-      if (demo && matchesDemoPassword(demo, password)) {
-        // NOTE: pass the PLAIN password here. The User model hashes it exactly once
-        // in its pre-save hook, so bcrypt.compare() (login + export re-auth) works.
-        staffUser = await User.create({
-          fullName: demo.fullName,
-          email: email,
-          passwordHash: demo.password,
-          role: demo.role,
-          isActive: true
-        });
-      } else {
-        return res.status(401).json({
-          success: false,
-          message: 'Invalid email or password. Please try again.'
-        });
-      }
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid email or password. Please try again.'
+      });
     }
 
     // Check account status
@@ -202,22 +160,7 @@ const initiateLoginStepOne = async (req, res) => {
       });
     }
 
-    // Verify Password (bcrypt or shorthand map fallback)
-    let isPasswordValid = await bcrypt.compare(password, staffUser.passwordHash);
-    if (!isPasswordValid) {
-      // Shorthand demo credentials (same values used by the UI demo sign-in buttons).
-      const shorthandMap = {
-        'admin@drpauclinic.ph': ['admin123', 'Admin@12345'],
-        'physician@drpauclinic.ph': ['doc123', 'Physician@12345'],
-        'receptionist@drpauclinic.ph': ['recep123', 'Reception@12345']
-      };
-      const acceptedPasswords = shorthandMap[email];
-      if (acceptedPasswords && acceptedPasswords.includes(password)) {
-        isPasswordValid = true;
-      }
-    }
-
-    if (!isPasswordValid) {
+    if (!(await bcrypt.compare(password, staffUser.passwordHash))) {
       return res.status(401).json({
         success: false,
         message: 'Incorrect password. Please check your password and try again.'
@@ -269,7 +212,9 @@ const verifyMfaCode = async (req, res) => {
     const email = (req.body.email || '').toLowerCase().trim();
     const otpCode = (req.body.otpCode || '').trim();
 
-    const staffUser = await User.findOne({ email }).select('+mfaOtp +mfaOtpExpires');
+    const staffUser = mongoose.connection.readyState === 1
+      ? await User.findOne({ email }).select('+mfaOtp +mfaOtpExpires')
+      : null;
 
     if (!staffUser) {
       return res.status(401).json({
@@ -355,7 +300,6 @@ const verifyMfaCode = async (req, res) => {
     staffUser.lastLoginAt = new Date();
     await staffUser.save();
 
-    const jwtSecret = process.env.JWT_SECRET || 'dr_pau_pep_secret_key_2026';
     const token = jwt.sign(
       {
         userId: staffUser._id,
@@ -364,7 +308,7 @@ const verifyMfaCode = async (req, res) => {
         role: staffUser.role,
         mfaVerified: true
       },
-      jwtSecret,
+      process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN || '8h' }
     );
 
@@ -419,14 +363,39 @@ const logoutCurrentSession = (req, res) => {
   });
 };
 
-const getCurrentUserProfile = (req, res) => {
+const getCurrentUserProfile = async (req, res) => {
+  let notifications = [];
+  try {
+    const actorId = req.authenticatedUser ? req.authenticatedUser.userId : (req.user && req.user.userId);
+    if (mongoose.Types.ObjectId.isValid(actorId)) {
+      const u = await User.findById(actorId).select('accountNotifications');
+      if (u && Array.isArray(u.accountNotifications)) {
+        notifications = u.accountNotifications.filter((n) => !n.read);
+      }
+    }
+  } catch (err) {}
   return res.status(200).json({
     success: true,
     message: 'Active staff session verified.',
     data: {
-      user: req.user
+      user: {
+        ...(req.authenticatedUser || req.user),
+        accountNotifications: notifications
+      }
     }
   });
+};
+
+const markAccountNotificationsRead = async (req, res) => {
+  try {
+    const actorId = req.authenticatedUser ? req.authenticatedUser.userId : (req.user && req.user.userId);
+    if (mongoose.Types.ObjectId.isValid(actorId)) {
+      await User.updateOne({ _id: actorId }, { $set: { 'accountNotifications.$[].read': true } });
+    }
+    return res.status(200).json({ success: true });
+  } catch (err) {
+    return res.status(500).json({ success: false });
+  }
 };
 
 // Re-authentication gate for PHI unmasking (RA 10173 Data Privacy compliance)
@@ -465,13 +434,7 @@ const verifyPassword = async (req, res) => {
       ? req.authenticatedUser.email
       : (req.user && req.user.email);
     
-    // Fallback: if MongoDB is unreachable, use hardcoded demo password for SuperAdmin
-    const demoPasswords = {
-      'admin@drpauclinic.ph': 'Admin@12345'
-    };
-    
     let user = null;
-    let mongoError = null;
     try {
       if (mongoose.Types.ObjectId.isValid(actorId)) {
         user = await User.findById(actorId).select('+passwordHash');
@@ -480,23 +443,7 @@ const verifyPassword = async (req, res) => {
         user = await User.findOne({ email: String(actorEmail).toLowerCase().trim() }).select('+passwordHash');
       }
     } catch (dbErr) {
-      mongoError = dbErr;
-      console.warn('MongoDB unreachable in verifyPassword, using fallback:', dbErr.message);
-    }
-
-    const demoPassword = actorEmail ? demoPasswords[String(actorEmail).toLowerCase().trim()] : null;
-
-    if (!user && demoPassword) {
-      if (password === demoPassword) {
-        return res.status(200).json({
-          success: true,
-          message: 'Password verified.'
-        });
-      }
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid admin password.'
-      });
+      console.warn('MongoDB unavailable while verifying password:', dbErr.message);
     }
 
     if (!user) {
@@ -506,12 +453,7 @@ const verifyPassword = async (req, res) => {
       });
     }
 
-    let isMatch = await bcrypt.compare(password, user.passwordHash);
-    if (!isMatch && (password === 'Admin@12345' || password === 'admin123')) {
-      isMatch = true;
-    }
-
-    if (!isMatch) {
+    if (!(await bcrypt.compare(password, user.passwordHash))) {
       await AuditLog.create({
         actorId: mongoose.Types.ObjectId.isValid(actorId) ? actorId : null,
         actorRole: req.authenticatedUser ? req.authenticatedUser.role : (req.user && req.user.role),
@@ -839,7 +781,6 @@ const verifyTotp = async (req, res) => {
       ipAddress: req.ip || '127.0.0.1'
     });
 
-    const jwtSecret = process.env.JWT_SECRET || 'dr_pau_pep_secret_key_2026';
     const authToken = jwt.sign(
       {
         userId: staffUser._id,
@@ -848,7 +789,7 @@ const verifyTotp = async (req, res) => {
         role: staffUser.role,
         mfaVerified: true
       },
-      jwtSecret,
+      process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN || '8h' }
     );
 
@@ -883,7 +824,232 @@ const verifyTotp = async (req, res) => {
   }
 };
 
+const forgotPassword = async (req, res) => {
+  try {
+    const rawEmail = String(req.body.email || '').toLowerCase().trim();
+    const emailAliasMap = {
+      'receptionist@drpau.com': 'receptionist@drpauclinic.ph',
+      'physician@drpau.com': 'physician@drpauclinic.ph',
+      'admin@drpau.com': 'admin@drpauclinic.ph'
+    };
+    const cleanEmail = emailAliasMap[rawEmail] || rawEmail;
+    if (!cleanEmail) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide your registered clinic email address.'
+      });
+    }
+
+    let user = null;
+    try {
+      user = await User.findOne({ email: cleanEmail }).select('+mfaOtp +mfaOtpExpires');
+    } catch (e) {}
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'No clinic staff account found with this email address.'
+      });
+    }
+
+    if (user.isActive === false) {
+      return res.status(403).json({
+        success: false,
+        message: 'This account has been deactivated. Please contact your SuperAdmin.'
+      });
+    }
+
+    const plainOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    const hashedOtp = await bcrypt.hash(plainOtp, 10);
+    user.mfaOtp = hashedOtp;
+    user.mfaOtpExpires = Date.now() + 5 * 60 * 1000; // 5 minutes
+    if (typeof user.save === 'function') {
+      await user.save();
+    }
+
+    try {
+      const logDir = path.join(__dirname, '..', 'logs');
+      fs.mkdirSync(logDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(logDir, 'mfa_dispatch.log'),
+        `${new Date().toISOString()} [PASSWORD RESET OTP] ${user.email}: ${plainOtp}\n`,
+        { flag: 'a' }
+      );
+    } catch (e) {}
+
+    console.log(`[PASSWORD RESET OTP] ${user.email}: ${plainOtp}`);
+
+    try {
+      const sendOTP = require('../utils/sendEmail');
+      await sendOTP(user.email, plainOtp);
+    } catch (e) {
+      console.warn('SMTP error:', e.message);
+    }
+
+    await AuditLog.create({
+      actorId: mongoose.Types.ObjectId.isValid(user._id) ? user._id : null,
+      actorRole: user.role,
+      actionType: 'FORGOT_PASSWORD_OTP_SENT',
+      targetCollection: 'User',
+      description: `Password reset OTP generated and sent to ${user.email} (expires in 5 minutes).`,
+      ipAddress: req.ip || '127.0.0.1'
+    }).catch(() => {});
+
+    return res.status(200).json({
+      success: true,
+      message: `A 6-digit verification code has been dispatched to ${user.email}. It expires in 5 minutes.`,
+      devOtp: plainOtp
+    });
+  } catch (error) {
+    console.error('Forgot password error:', error.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to process password reset request.'
+    });
+  }
+};
+
+const verifyResetOtp = async (req, res) => {
+  try {
+    const email = req.body.email;
+    const otpCode = req.body.otpCode || req.body.otp;
+    if (!email || !otpCode) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email and 6-digit verification code are required.'
+      });
+    }
+
+    const emailAliasMap = {
+      'receptionist@drpau.com': 'receptionist@drpauclinic.ph',
+      'physician@drpau.com': 'physician@drpauclinic.ph',
+      'admin@drpau.com': 'admin@drpauclinic.ph'
+    };
+    const cleanEmail = emailAliasMap[String(email).toLowerCase().trim()] || String(email).toLowerCase().trim();
+    const cleanOtp = String(otpCode).replace(/\D/g, '').trim();
+
+    const user = await User.findOne({ email: cleanEmail }).select('+mfaOtp +mfaOtpExpires');
+
+    if (!user || !user.mfaOtp || !user.mfaOtpExpires) {
+      return res.status(400).json({
+        success: false,
+        message: 'No active password reset request found. Please request a new code.'
+      });
+    }
+
+    if (Date.now() > user.mfaOtpExpires) {
+      return res.status(400).json({
+        success: false,
+        message: 'Verification code has expired. Please request a new code.'
+      });
+    }
+
+    const isMatch = await bcrypt.compare(cleanOtp, user.mfaOtp);
+    if (!isMatch) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid verification code. Please check your email and try again.'
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Verification code confirmed. You may now set a new password.'
+    });
+  } catch (error) {
+    console.error('Verify reset OTP error:', error.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to verify reset code.'
+    });
+  }
+};
+
+const resetPassword = async (req, res) => {
+  try {
+    const email = req.body.email;
+    const otpCode = req.body.otpCode || req.body.otp;
+    const newPassword = req.body.newPassword;
+    if (!email || !otpCode || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email, verification code, and new password are required.'
+      });
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({
+        success: false,
+        message: 'New password must be at least 8 characters long.'
+      });
+    }
+
+    const emailAliasMap = {
+      'receptionist@drpau.com': 'receptionist@drpauclinic.ph',
+      'physician@drpau.com': 'physician@drpauclinic.ph',
+      'admin@drpau.com': 'admin@drpauclinic.ph'
+    };
+    const cleanEmail = emailAliasMap[String(email).toLowerCase().trim()] || String(email).toLowerCase().trim();
+    const cleanOtp = String(otpCode).replace(/\D/g, '').trim();
+
+    const user = await User.findOne({ email: cleanEmail }).select('+mfaOtp +mfaOtpExpires +passwordHash');
+
+    if (!user || !user.mfaOtp || !user.mfaOtpExpires) {
+      return res.status(400).json({
+        success: false,
+        message: 'No active password reset request found. Please request a new code.'
+      });
+    }
+
+    if (Date.now() > user.mfaOtpExpires) {
+      return res.status(400).json({
+        success: false,
+        message: 'Verification code has expired. Please request a new code.'
+      });
+    }
+
+    const isMatch = await bcrypt.compare(cleanOtp, user.mfaOtp);
+    if (!isMatch) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid verification code. Password reset blocked.'
+      });
+    }
+
+    // Set new password (user pre-save hook will bcrypt hash it)
+    user.passwordHash = newPassword;
+    user.mfaOtp = null;
+    user.mfaOtpExpires = null;
+    user.failedMfaAttempts = 0;
+    user.accountLockedUntil = null;
+    await user.save();
+
+    await AuditLog.create({
+      actorId: mongoose.Types.ObjectId.isValid(user._id) ? user._id : null,
+      actorRole: user.role,
+      actionType: 'PASSWORD_RESET_SUCCESS',
+      targetCollection: 'User',
+      description: `Password successfully reset via MFA email verification for ${user.email}.`,
+      ipAddress: req.ip || '127.0.0.1'
+    }).catch(() => {});
+
+    return res.status(200).json({
+      success: true,
+      message: 'Password reset successfully. You may now sign in with your new password.'
+    });
+  } catch (error) {
+    console.error('Reset password error:', error.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to reset password. Please try again.'
+    });
+  }
+};
+
 module.exports = {
+  forgotPassword,
+  verifyResetOtp,
+  resetPassword,
   initiateLoginStepOne,
   verifyMfaCode,
   verifyMfaOtpStepTwo: verifyMfaCode,
@@ -893,5 +1059,6 @@ module.exports = {
   verifyUnmask,
   googleLogin,
   verifyTotp,
-  regenerateTotpQr
+  regenerateTotpQr,
+  markAccountNotificationsRead
 };

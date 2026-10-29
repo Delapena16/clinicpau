@@ -2,19 +2,19 @@ require('dotenv').config();
 const bcrypt = require('bcryptjs');
 const connectToDatabase = require('../config/db');
 const User = require('../models/User');
+const testPasswords = require('./testCredentials');
 
-// Canonical demo credentials (must match public/js/app.js DEMO_CREDENTIALS_MAP).
-const DEMO_ACCOUNTS = {
-  'admin@drpauclinic.ph': 'Admin@12345',
-  'physician@drpauclinic.ph': 'Physician@12345',
-  'receptionist@drpauclinic.ph': 'Reception@12345'
+const TEST_ACCOUNTS = {
+  'admin@drpauclinic.ph': testPasswords.admin,
+  'physician@drpauclinic.ph': testPasswords.physician,
+  'receptionist@drpauclinic.ph': testPasswords.receptionist
 };
 
 (async () => {
   try {
     await connectToDatabase();
 
-    for (const [email, password] of Object.entries(DEMO_ACCOUNTS)) {
+    for (const [email, password] of Object.entries(TEST_ACCOUNTS)) {
       const user = await User.findOne({ email }).select('+passwordHash');
       if (!user) {
         console.log(`Skipped (not seeded): ${email}`);
@@ -43,7 +43,7 @@ const DEMO_ACCOUNTS = {
       );
     }
 
-    console.log('Default accounts ensured active and usable for login + export re-auth.');
+    console.log('Test accounts ensured active and usable for login + export re-auth.');
   } catch (err) {
     console.error('Error:', err.message);
   } finally {

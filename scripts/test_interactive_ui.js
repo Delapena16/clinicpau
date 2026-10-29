@@ -1,4 +1,5 @@
 require('dotenv').config();
+const testPasswords = require('./testCredentials');
 const fs = require('fs');
 const path = require('path');
 const http = require('http');
@@ -396,7 +397,7 @@ async function runLiveApiAndClinicalSimulation() {
 
   try {
     // 1. Receptionist Login & Session Verification
-    const recAuth = await loginAsRole('receptionist@drpauclinic.ph', 'Reception@12345');
+    const recAuth = await loginAsRole('receptionist@drpauclinic.ph', testPasswords.receptionist);
     assertCheck(
       recAuth.step1.status === 200 && recAuth.step2.status === 200,
       'API 1 & 2: POST /api/auth/login & POST /api/auth/verify-otp (Receptionist 2FA)'
@@ -452,7 +453,7 @@ async function runLiveApiAndClinicalSimulation() {
     );
 
     // 4. Physician Login & Clarissa Dizon-Gomez (PEP-2026-002) Triage + Day 0 Dose Test
-    const physAuth = await loginAsRole('physician@drpauclinic.ph', 'Physician@12345');
+    const physAuth = await loginAsRole('physician@drpauclinic.ph', testPasswords.physician);
     assertCheck(physAuth.step2.status === 200, 'Physician 2FA login completed');
 
     const physQueueRes = await requestJson('GET', '/api/physician/queue', null, physAuth.cookie);
@@ -547,7 +548,7 @@ async function runLiveApiAndClinicalSimulation() {
     );
 
     // 5. SuperAdmin Login & Endpoints
-    const adminAuth = await loginAsRole('admin@drpauclinic.ph', 'Admin@12345');
+    const adminAuth = await loginAsRole('admin@drpauclinic.ph', testPasswords.admin);
     assertCheck(adminAuth.step2.status === 200, 'SuperAdmin 2FA login completed');
 
     const overviewRes = await requestJson('GET', '/api/admin/overview', null, adminAuth.cookie);
@@ -644,4 +645,3 @@ async function runLiveApiAndClinicalSimulation() {
 
   process.exit(failCount > 0 ? 1 : 0);
 })();
-

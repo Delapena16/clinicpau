@@ -35,6 +35,10 @@
   - `node scripts/test_interactive_ui.js` (DOM Integrity & VM Interaction)
   - `node scripts/verify_system.js` (System Verification)
 
+## Test Account Setup
+- Set `ADMIN_TEST_PASSWORD`, `PHYSICIAN_TEST_PASSWORD`, and `RECEPTIONIST_TEST_PASSWORD` in the local `.env` before running the login-based QA or account-reset scripts.
+- Set a unique `JWT_SECRET` in `.env`; the server does not provide a built-in signing key.
+
 ## Real-World Application Scenarios (Tier 4)
 | # | Scenario | Features Exercised | Complexity |
 |---|----------|--------------------|------------|

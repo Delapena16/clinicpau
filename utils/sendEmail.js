@@ -21,7 +21,7 @@ const sendOTP = async (email, otp) => {
     }
   });
 
-  await transporter.verify();
+  // Direct sendMail handles authentication and connection
 
   const info = await transporter.sendMail({
     from: `"Dr. Pau ABTC" <${gmailUser}>`,

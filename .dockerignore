@@ -1,0 +1,31 @@
+# Dependencies (reinstalled inside the image)
+node_modules/
+npm-debug.log*
+
+# Version control
+.git/
+.gitignore
+
+# Local secrets & environment (injected at runtime by docker-compose instead)
+.env
+.env.*
+!.env.example
+
+# Logs & temp files
+logs/
+*.log
+tmp/
+temp/
+*.tmp
+coverage/
+.DS_Store
+Thumbs.db
+
+# Editor / IDE
+.vscode/
+.idea/
+
+# Docker files themselves
+Dockerfile
+docker-compose.yml
+.dockerignore

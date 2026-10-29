@@ -31,7 +31,7 @@ const connectToDatabase = async () => {
     await Promise.race([connectPromise, timeoutPromise]);
 
     console.log('Connected to Dr. Pau MongoDB database');
-  } catch (error) {
+  } catch (error) { mongoose.set('bufferCommands', false);
     console.warn('MongoDB connection warning: ' + error.message);
     console.warn('Running with in-memory clinic store until MongoDB is reachable.');
   }

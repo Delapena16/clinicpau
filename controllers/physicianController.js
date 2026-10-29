@@ -84,7 +84,10 @@ const enrichForecastWithLiveInventory = (baseForecast, inventoryItems = []) => {
   return {
     ...baseForecast,
     generatedAt: new Date().toISOString(),
-    vialForecasts: updatedVialForecasts
+    vialForecasts: updatedVialForecasts,
+    anomalyDetection: baseForecast.anomalyDetection
+      ? { ...baseForecast.anomalyDetection, lastScan: new Date().toISOString() }
+      : null
   };
 };
 
@@ -350,7 +353,8 @@ const recalculateMonthlyForecast = async (req, res) => {
       categoryBreakdown: updatedForecast.categoryBreakdown,
       purokBreakdown: updatedForecast.purokBreakdown,
       weeklyTrends: updatedForecast.weeklyTrends,
-      completionVsDefaulterRates: updatedForecast.completionVsDefaulterRates
+      completionVsDefaulterRates: updatedForecast.completionVsDefaulterRates,
+      anomalyDetection: updatedForecast.anomalyDetection
     });
 
     return res.status(200).json({

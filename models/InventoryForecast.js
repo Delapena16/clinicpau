@@ -63,6 +63,10 @@ const inventoryForecastSchema = new mongoose.Schema(
       pendingCount: Number,
       completionRatePercent: Number,
       defaulterRatePercent: Number
+    },
+    anomalyDetection: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null
     }
   },
   {

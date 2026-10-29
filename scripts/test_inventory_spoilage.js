@@ -1,4 +1,5 @@
 require('dotenv').config();
+const testPasswords = require('./testCredentials');
 const fs = require('fs');
 const path = require('path');
 const http = require('http');
@@ -106,7 +107,7 @@ async function loginAsRole(email, password) {
 
   try {
     // 1. SuperAdmin Login
-    const adminAuth = await loginAsRole('admin@drpauclinic.ph', 'Admin@12345');
+    const adminAuth = await loginAsRole('admin@drpauclinic.ph', testPasswords.admin);
     assertCheck(adminAuth.step2?.status === 200, 'SuperAdmin 2FA login successful');
 
     // Fetch current inventory
@@ -168,7 +169,7 @@ async function loginAsRole(email, password) {
     );
 
     // 5. RBAC Protection: Non-Admin attempts
-    const physAuth = await loginAsRole('physician@drpauclinic.ph', 'Physician@12345');
+    const physAuth = await loginAsRole('physician@drpauclinic.ph', testPasswords.physician);
     const physForbiddenRes = await requestJson(
       'POST',
       '/api/inventory/spoilage',
@@ -180,7 +181,7 @@ async function loginAsRole(email, password) {
       'RBAC Boundary: Physician blocked from /api/inventory/spoilage with HTTP 403 Forbidden'
     );
 
-    const recepAuth = await loginAsRole('receptionist@drpauclinic.ph', 'Reception@12345');
+    const recepAuth = await loginAsRole('receptionist@drpauclinic.ph', testPasswords.receptionist);
     const recepForbiddenRes = await requestJson(
       'POST',
       '/api/inventory/spoilage',

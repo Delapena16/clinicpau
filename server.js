@@ -1,4 +1,7 @@
 require('dotenv').config();
+if (!process.env.JWT_SECRET) {
+  throw new Error('JWT_SECRET must be set in the environment before starting the server.');
+}
 const path = require('path');
 const express = require('express');
 const mongoose = require('mongoose');
@@ -17,7 +20,8 @@ const {
   logInventorySpoilageOrVoid,
   getDashboardSummary,
   getRecentAuditLogs,
-  logDataExport
+  logDataExport,
+  updateInventoryBatchStatus
 } = require('./controllers/adminController');
 const { ensureSettings } = require('./controllers/settingsController');
 const { verifyAuthenticationToken } = require('./middleware/authMiddleware');
@@ -37,13 +41,13 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net', 'https://accounts.google.com'],
+        scriptSrc: ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net', 'https://cdnjs.cloudflare.com', 'https://accounts.google.com'],
         scriptSrcAttr: ["'unsafe-inline'"],
-        styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com', 'https://cdnjs.cloudflare.com'],
+        styleSrc: ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net', 'https://cdnjs.cloudflare.com', 'https://fonts.googleapis.com'],
         fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:', 'https://cdnjs.cloudflare.com'],
         imgSrc: ["'self'", 'data:', 'https://*.googleusercontent.com'],
         frameSrc: ["'self'", 'https://accounts.google.com'],
-        connectSrc: ["'self'", 'https://accounts.google.com', 'https://oauth2.googleapis.com']
+        connectSrc: ["'self'", 'https://cdn.jsdelivr.net', 'https://accounts.google.com', 'https://oauth2.googleapis.com']
       }
     },
     crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
@@ -70,9 +74,9 @@ app.use(
   })
 );
 
-const authRateLimiter = rateLimit({
+const isDevMode = process.env.NODE_ENV !== 'production'; const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 150,
+  max: 5000, skip: () => isDevMode,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -83,7 +87,7 @@ const authRateLimiter = rateLimit({
 
 const apiRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 600,
+  max: 5000, skip: () => isDevMode,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -128,6 +132,9 @@ app.patch('/api/admin/staff/:id/toggle-status', verifyAuthenticationToken, autho
 // ito yung direct endpoint para sa void o log spoilage ng vials
 app.post('/api/inventory/spoilage', verifyAuthenticationToken, authorizeRoles('SuperAdmin'), logInventorySpoilageOrVoid);
 app.post('/api/inventory/void', verifyAuthenticationToken, authorizeRoles('SuperAdmin'), logInventorySpoilageOrVoid);
+app.post('/api/admin/inventory/status', verifyAuthenticationToken, authorizeRoles('SuperAdmin'), updateInventoryBatchStatus);
+app.patch('/api/admin/inventory/status', verifyAuthenticationToken, authorizeRoles('SuperAdmin'), updateInventoryBatchStatus);
+app.post('/api/inventory/status', verifyAuthenticationToken, authorizeRoles('SuperAdmin'), updateInventoryBatchStatus);
 
 // Live KPI metrics for the Clinic Overview
 app.get('/api/dashboard/summary', verifyAuthenticationToken, authorizeRoles('SuperAdmin'), getDashboardSummary);

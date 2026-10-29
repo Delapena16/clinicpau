@@ -169,5 +169,47 @@
     "pendingCount": 52,
     "completionRatePercent": 93.3,
     "defaulterRatePercent": 6.7
+  },
+  "anomalyDetection": {
+    "status": "ANOMALY_DETECTED",
+    "anomalyCount": 3,
+    "lastScan": "2026-10-29T08:00:00Z",
+    "zScoreThreshold": 1.96,
+    "confidenceLevel": "95%",
+    "anomalies": [
+      {
+        "id": "ANOM-01",
+        "type": "EPIDEMIOLOGICAL_SURGE",
+        "title": "Purok 6 Stray Dog Outbreak Cluster",
+        "severity": "CRITICAL",
+        "severityClass": "badge-red",
+        "zScore": "+2.41",
+        "metric": "+180% vs 4-Wk Mean",
+        "description": "Statistically significant cluster of transdermal bite incidents detected in Purok 6 (Riverbank). Unvaccinated stray canine pack activity identified as the primary transmission vector (71%).",
+        "recommendation": "Coordinate immediate animal control containment with Barangay LGU and prioritize ERIG/PVRV buffer stock."
+      },
+      {
+        "id": "ANOM-02",
+        "type": "INVENTORY_VELOCITY",
+        "title": "ERIG Biologic Burn Velocity Outlier",
+        "severity": "CRITICAL",
+        "severityClass": "badge-red",
+        "zScore": "+2.15",
+        "metric": "2.3x Baseline Depletion",
+        "description": "Equirab (ERIG) consumption velocity surged due to consecutive Category III transdermal presentations. Current stock (7 vials) is critically below the 10-vial threshold, with runway depleted to 7 days.",
+        "recommendation": "Expedite emergency replenishment of at least 30 vials to avoid stockout within 7 days."
+      },
+      {
+        "id": "ANOM-03",
+        "type": "REGIMEN_ADHERENCE",
+        "title": "Day 3 & Day 7 Adherence Drop-Off Spike",
+        "severity": "ELEVATED",
+        "severityClass": "badge-amber",
+        "zScore": "+1.89",
+        "metric": "14.2% Missed Booster Rate",
+        "description": "Patient drop-off between Day 0 and Day 7 increased from baseline 4.5% to 14.2%, elevating secondary rabies breakthrough risks.",
+        "recommendation": "Trigger automated SMS/phone recall reminders for defaulting patients on Day 3 and Day 7 boosters."
+      }
+    ]
   }
 }

@@ -71,6 +71,19 @@ const userSchema = new mongoose.Schema(
     isTotpSetup: {
       type: Boolean,
       default: false
+    },
+    accountNotifications: [
+      {
+        message: { type: String, required: true },
+        title: { type: String, default: 'Account Security Notice' },
+        actionType: { type: String, default: 'UPDATE' },
+        createdAt: { type: Date, default: Date.now },
+        read: { type: Boolean, default: false }
+      }
+    ],
+    isAccountNotified: {
+      type: Boolean,
+      default: false
     }
   },
   {

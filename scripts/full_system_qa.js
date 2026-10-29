@@ -1,4 +1,5 @@
 require('dotenv').config();
+const testPasswords = require('./testCredentials');
 const fs = require('fs');
 const path = require('path');
 const http = require('http');
@@ -278,7 +279,7 @@ async function runFullSystemQa() {
     // 2A. Receptionist Flow
     const receptionistToken = await loginRole(
       'receptionist@drpauclinic.ph',
-      'Reception@12345',
+      testPasswords.receptionist,
       'Receptionist'
     );
 
@@ -385,7 +386,7 @@ async function runFullSystemQa() {
     // 2B. Physician Flow
     const physicianToken = await loginRole(
       'physician@drpauclinic.ph',
-      'Physician@12345',
+      testPasswords.physician,
       'Physician'
     );
 
@@ -490,7 +491,7 @@ async function runFullSystemQa() {
     );
 
     // 2C. SuperAdmin Flow
-    const adminToken = await loginRole('admin@drpauclinic.ph', 'Admin@12345', 'SuperAdmin');
+    const adminToken = await loginRole('admin@drpauclinic.ph', testPasswords.admin, 'SuperAdmin');
 
     const beforeTetanusBatch = await Inventory.findOne({ batchNumber: 'TTX-2026-B204' }).lean();
     const initialTetanusStock = beforeTetanusBatch ? Number(beforeTetanusBatch.currentStock) : 0;

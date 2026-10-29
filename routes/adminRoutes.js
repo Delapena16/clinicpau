@@ -13,7 +13,8 @@ const {
   updatePatientDemographics,
   getDashboardSummary,
   getRecentAuditLogs,
-  logDataExport
+  logDataExport,
+  updateInventoryBatchStatus
 } = require('../controllers/adminController');
 const {
   getPySparkAnalyticsSummary,
@@ -92,6 +93,9 @@ router.post('/inventory/restock', restockValidators, addOrRestockVaccineBatch);
 router.post('/inventory/spoilage', logInventorySpoilageOrVoid);
 router.post('/inventory/void', logInventorySpoilageOrVoid);
 router.get('/inventory', getInventoryStatusAndAlerts);
+router.post('/inventory/status', updateInventoryBatchStatus);
+router.patch('/inventory/status', updateInventoryBatchStatus);
+router.patch('/inventory/:id/status', updateInventoryBatchStatus);
 
 router.get('/forecast', getPySparkAnalyticsSummary);
 router.post('/forecast/recalculate', recalculateMonthlyForecast);

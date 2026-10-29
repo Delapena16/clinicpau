@@ -1,4 +1,5 @@
 require('dotenv').config();
+const testPasswords = require('./testCredentials');
 const fs = require('fs');
 const path = require('path');
 const http = require('http');
@@ -106,7 +107,7 @@ async function loginAsRole(email, password) {
 
   try {
     // 1. Receptionist Login & Sequential Dosing Test
-    const recepAuth = await loginAsRole('receptionist@drpauclinic.ph', 'Reception@12345');
+    const recepAuth = await loginAsRole('receptionist@drpauclinic.ph', testPasswords.receptionist);
     assertCheck(recepAuth.step2?.status === 200, 'Receptionist logged in successfully via 2FA');
 
     // Register a new test patient
@@ -132,7 +133,7 @@ async function loginAsRole(email, password) {
     assertCheck(Boolean(patientId), `New patient assigned ID: ${patientId}`);
 
     // Physician Login
-    const physAuth = await loginAsRole('physician@drpauclinic.ph', 'Physician@12345');
+    const physAuth = await loginAsRole('physician@drpauclinic.ph', testPasswords.physician);
     assertCheck(physAuth.step2?.status === 200, 'Physician logged in successfully via 2FA');
 
     // Physician Triage as Category II (populates schedule with +0, 3, 7, 14, 28 days)
@@ -253,7 +254,7 @@ async function loginAsRole(email, password) {
     );
 
     // SuperAdmin Login for Demographics & Staff IAM Toggle tests
-    const adminAuth = await loginAsRole('admin@drpauclinic.ph', 'Admin@12345');
+    const adminAuth = await loginAsRole('admin@drpauclinic.ph', testPasswords.admin);
     assertCheck(adminAuth.step2?.status === 200, 'SuperAdmin logged in successfully via 2FA');
 
     // Clerical Demographic Update route (PUT /api/patients/demographics/:id)

@@ -1,4 +1,5 @@
 require('dotenv').config();
+const testPasswords = require('./testCredentials');
 const fs = require('fs');
 const path = require('path');
 const http = require('http');
@@ -168,17 +169,17 @@ async function runVerificationSuite() {
 
     const receptionistToken = await authenticateStaffRole(
       'receptionist@drpauclinic.ph',
-      'Reception@12345',
+      testPasswords.receptionist,
       'Receptionist'
     );
     const physicianToken = await authenticateStaffRole(
       'physician@drpauclinic.ph',
-      'Physician@12345',
+      testPasswords.physician,
       'Physician'
     );
     const adminToken = await authenticateStaffRole(
       'admin@drpauclinic.ph',
-      'Admin@12345',
+      testPasswords.admin,
       'SuperAdmin'
     );
 

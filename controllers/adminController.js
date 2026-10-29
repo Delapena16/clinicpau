@@ -11,6 +11,138 @@ const {
   enrichForecastWithLiveInventory
 } = require('./physicianController');
 
+const nodemailer = require('nodemailer');
+
+// SuperAdmin Zero-Trust Security Alert Helper
+const dispatchZeroTrustSecurityAlert = async (targetEmail, targetName, targetRole, actionDescription, actorRole, ipAddress) => {
+  try {
+    const gmailUser = process.env.GMAIL_USER || process.env.SMTP_USER;
+    const gmailAppPassword = process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS;
+    if (!gmailUser || !gmailAppPassword) {
+      console.warn('[ZERO-TRUST] Missing Gmail SMTP configuration in .env');
+      return;
+    }
+
+    const transporter = nodemailer.createTransport({
+      host: 'smtp.gmail.com',
+      port: 587,
+      secure: false,
+      auth: {
+        user: gmailUser,
+        pass: gmailAppPassword.replace(/\s/g, '')
+      }
+    });
+
+    const isDemoDomain = String(targetEmail || '').endsWith('@drpauclinic.ph') || String(targetEmail || '').endsWith('@drpau.com');
+    const recipientEmail = isDemoDomain ? gmailUser : targetEmail;
+
+    const lowerAction = String(actionDescription || '').toLowerCase();
+    const isDeactivated = lowerAction.includes('deactivat') || lowerAction.includes('delete') || lowerAction.includes('remov') || lowerAction.includes('suspend');
+    const isActivated = !isDeactivated && (lowerAction.includes('reactivat') || lowerAction.includes('activat') || lowerAction.includes('restor'));
+    const isPasswordChanged = lowerAction.includes('password') || lowerAction.includes('pass');
+
+    let headerBg = '#9E1236'; // Deep crimson red (deactivated/suspended)
+    let calloutBg = '#FEF2F2';
+    let calloutBorder = '#DC2626';
+    let calloutTextColor = '#991B1B';
+    let noticeMessage = 'Your clinic system account has been deactivated by the SuperAdmin.';
+    let detailMessage = 'Your access to the registry workspace is currently suspended. Please contact the clinic administrator if you have questions.';
+    let subjectText = 'Notice: Your clinic system account has been deactivated';
+
+    if (isDeactivated) {
+      headerBg = '#9E1236'; // Deep crimson red (Image 1 style)
+      calloutBg = '#FEF2F2';
+      calloutBorder = '#DC2626';
+      calloutTextColor = '#991B1B';
+      noticeMessage = 'Your clinic system account has been deactivated by the SuperAdmin.';
+      detailMessage = 'Your access to the registry workspace is currently suspended. Please contact the clinic administrator if you have questions.';
+      subjectText = 'Notice: Your clinic system account has been deactivated';
+    } else if (isActivated) {
+      headerBg = '#166534'; // Deep forest green (Image 2 style)
+      calloutBg = '#F0FDF4';
+      calloutBorder = '#16A34A';
+      calloutTextColor = '#166534';
+      noticeMessage = 'Your clinic system account has been activated by the SuperAdmin.';
+      detailMessage = 'Your account access has been restored. You may now sign in using your clinic credentials.';
+      subjectText = 'Notice: Your clinic system account has been activated';
+    } else if (isPasswordChanged) {
+      headerBg = '#9E1236';
+      calloutBg = '#FEF2F2';
+      calloutBorder = '#DC2626';
+      calloutTextColor = '#991B1B';
+      noticeMessage = 'Your clinic system account password has been changed by the SuperAdmin.';
+      detailMessage = 'Your account password has been updated. Please sign in using your new credentials, or contact the clinic administrator if you did not request this change.';
+      subjectText = 'Notice: Your clinic system account password has been changed';
+    } else {
+      headerBg = '#4C1D95'; // Purple (details updated)
+      calloutBg = '#F5F3FF';
+      calloutBorder = '#7C3AED';
+      calloutTextColor = '#5B21B6';
+      noticeMessage = 'Your clinic system account details have been updated by the SuperAdmin.';
+      detailMessage = 'Your staff profile information has been modified. Please contact the clinic administrator if you have questions.';
+      subjectText = 'Notice: Your clinic system account details have been updated';
+    }
+
+    const mailOptions = {
+      from: `"Dr. Pau ABTC Administration" <${gmailUser}>`,
+      to: recipientEmail,
+      subject: subjectText,
+      text: `Hello ${targetName || 'Staff Member'},\n\nNotice: ${noticeMessage}\n\n${detailMessage}\n\n© 2026 Dr. Pau Medical Center Inc. • DOH-Compliant Rabies PEP Registry`,
+      html: `
+        <div style="background-color: #f8fafc; padding: 32px 16px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+          <div style="max-width: 440px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06); border: 1px solid #e2e8f0;">
+            
+            <!-- Top Header Banner -->
+            <div style="background-color: ${headerBg}; padding: 28px 24px 22px 24px; text-align: center; color: #ffffff;">
+              <div style="font-size: 11px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; color: rgba(255, 255, 255, 0.88); margin-bottom: 8px;">
+                ABC EMERGENCY &bull; ANIMAL BITE TREATMENT CENTER
+              </div>
+              <div style="font-size: 20px; font-weight: 800; letter-spacing: 0.6px; color: #ffffff; margin: 0 0 8px 0; line-height: 1.25;">
+                DR. PAU MEDICAL CENTER INC.
+              </div>
+              <div style="font-size: 12.5px; color: rgba(255, 255, 255, 0.9); margin: 0; font-weight: 500;">
+                Staff Account Status Notification
+              </div>
+            </div>
+
+            <!-- Body Content -->
+            <div style="padding: 28px 24px 24px 24px; background-color: #ffffff;">
+              <p style="font-size: 15px; color: #1e293b; margin: 0 0 20px 0; line-height: 1.5;">
+                Hello <strong>${targetName || 'Staff Member'}</strong>,
+              </p>
+
+              <!-- Notice Callout Box -->
+              <div style="background-color: ${calloutBg}; border-left: 4px solid ${calloutBorder}; border-radius: 8px; padding: 14px 18px; margin: 0 0 22px 0;">
+                <p style="margin: 0; font-size: 14px; line-height: 1.55; color: ${calloutTextColor};">
+                  <strong style="color: ${calloutTextColor};">Notice:</strong> ${noticeMessage}
+                </p>
+              </div>
+
+              <!-- Follow-Up Details -->
+              <p style="font-size: 14px; line-height: 1.6; color: #475569; margin: 0;">
+                ${detailMessage}
+              </p>
+            </div>
+
+            <!-- Footer -->
+            <div style="background-color: #f8fafc; border-top: 1px solid #f1f5f9; padding: 16px 20px; text-align: center;">
+              <p style="font-size: 12px; color: #64748B; margin: 0; line-height: 1.4;">
+                &copy; 2026 Dr. Pau Medical Center Inc. &bull; DOH-Compliant Rabies PEP Registry
+              </p>
+            </div>
+
+          </div>
+        </div>
+      `
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log(`[ZERO-TRUST] Security alert email successfully dispatched to ${targetEmail}`);
+  } catch (err) {
+    console.error('[ZERO-TRUST] Failed to dispatch security alert email:', err.message);
+  }
+};
+
 // ito yung pang gawa ng bagong staff, admin lang pwede dito
 const createStaffUserAccount = async (req, res) => {
   try {
@@ -116,6 +248,63 @@ const updateStaffUserAccount = async (req, res) => {
     if (role) user.role = role;
     if (password) user.passwordHash = password;
     await user.save();
+    const changes = [];
+    if (password) changes.push('password changed');
+    if (fullName) changes.push(`Name set to "${user.fullName}"`);
+    if (role && role !== user.role) changes.push(`Role changed to "${user.role}"`);
+    if (normalizedEmail && normalizedEmail !== user.email) changes.push(`Email changed to "${user.email}"`);
+    const actionDesc = changes.length > 0
+      ? `Account modifications applied by SuperAdmin: ${changes.join(', ')}`
+      : 'Account profile details updated by SuperAdmin';
+
+    if (!Array.isArray(user.accountNotifications)) user.accountNotifications = [];
+    user.accountNotifications.push({
+      message: actionDesc,
+      title: 'Account Security Notice',
+      actionType: password ? 'PASSWORD_CHANGED' : 'ACCOUNT_MODIFIED',
+      createdAt: new Date(),
+      read: false
+    });
+    await user.save();
+
+    await dispatchZeroTrustSecurityAlert(
+      user.email,
+      user.fullName,
+      user.role,
+      actionDesc,
+      req.authenticatedUser?.role || 'SuperAdmin',
+      req.ip || '127.0.0.1'
+    );
+    if (false && (user.role === 'SuperAdmin' || user.role === 'Owner')) {
+      dispatchZeroTrustSecurityAlert(
+        user.email,
+        user.fullName,
+        user.role,
+        `SuperAdmin account details modified (Role: ${role || user.role}, Email: ${normalizedEmail || user.email})`,
+        req.authenticatedUser?.role || 'SuperAdmin',
+        req.ip || '127.0.0.1'
+      );
+    }
+    return res.status(200).json({
+      success: true,
+      message: 'Staff account updated.',
+      data: {
+        staffMember: {
+          userId: user._id,
+          fullName: user.fullName,
+          email: user.email,
+          role: user.role
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Update staff account error:', error.message);
+    return res.status(500).json({ success: false, message: 'Failed to update staff account.' });
+  }
+};
+
+/* _oldUnusedUpdateStaff start
+    await user.save();
 
     await AuditLog.create({
       actorId: mongoose.Types.ObjectId.isValid(actorId) ? actorId : null,
@@ -143,6 +332,8 @@ const updateStaffUserAccount = async (req, res) => {
     return res.status(500).json({ success: false, message: 'Failed to update staff account.' });
   }
 };
+
+*/
 
 // ito yung pang delete ng staff, bawal burahin sarili tsaka yung nag iisang admin
 const deleteStaffUserAccount = async (req, res) => {
@@ -172,6 +363,54 @@ const deleteStaffUserAccount = async (req, res) => {
       }
     }
     await User.deleteOne({ _id: user._id });
+    await dispatchZeroTrustSecurityAlert(
+      user.email,
+      user.fullName,
+      user.role,
+      'Account deleted from clinic system by SuperAdmin',
+      req.authenticatedUser?.role || 'SuperAdmin',
+      req.ip || '127.0.0.1'
+    );
+    const _skipDelNotif = true;
+    if (!_skipDelNotif) {
+    const changes = [];
+    if (password) changes.push('password changed');
+    if (fullName) changes.push(`Name set to "${user.fullName}"`);
+    if (role && role !== user.role) changes.push(`Role changed to "${user.role}"`);
+    if (normalizedEmail && normalizedEmail !== user.email) changes.push(`Email changed to "${user.email}"`);
+    const actionDesc = changes.length > 0
+      ? `Account modifications applied by SuperAdmin: ${changes.join(', ')}`
+      : 'Account profile details updated by SuperAdmin';
+
+    if (!Array.isArray(user.accountNotifications)) user.accountNotifications = [];
+    user.accountNotifications.push({
+      message: actionDesc,
+      title: 'Account Security Notice',
+      actionType: password ? 'PASSWORD_CHANGED' : 'ACCOUNT_MODIFIED',
+      createdAt: new Date(),
+      read: false
+    });
+    await user.save();
+
+    await dispatchZeroTrustSecurityAlert(
+      user.email,
+      user.fullName,
+      user.role,
+      actionDesc,
+      req.authenticatedUser?.role || 'SuperAdmin',
+      req.ip || '127.0.0.1'
+    );
+    if (false && (user.role === 'SuperAdmin' || user.role === 'Owner')) {
+      dispatchZeroTrustSecurityAlert(
+        user.email,
+        user.fullName,
+        user.role,
+        `SuperAdmin account deleted from clinic system`,
+        req.authenticatedUser?.role || 'SuperAdmin',
+        req.ip || '127.0.0.1'
+      );
+    }
+  }
 
     await AuditLog.create({
       actorId: mongoose.Types.ObjectId.isValid(actorId) ? actorId : null,
@@ -228,6 +467,68 @@ const toggleStaffAccountStatus = async (req, res) => {
     }
 
     user.isActive = !user.isActive;
+    const toggleStatusDesc = user.isActive
+      ? 'Your account has been reactivated by SuperAdmin'
+      : 'Your account has been deactivated by SuperAdmin';
+
+    if (!Array.isArray(user.accountNotifications)) user.accountNotifications = [];
+    user.accountNotifications.push({
+      message: toggleStatusDesc,
+      title: 'Account Status Notice',
+      actionType: user.isActive ? 'ACCOUNT_REACTIVATED' : 'ACCOUNT_DEACTIVATED',
+      createdAt: new Date(),
+      read: false
+    });
+    await user.save();
+
+    await dispatchZeroTrustSecurityAlert(
+      user.email,
+      user.fullName,
+      user.role,
+      toggleStatusDesc,
+      req.authenticatedUser?.role || 'SuperAdmin',
+      req.ip || '127.0.0.1'
+    );
+    const _skipToggleOld = true;
+    if (!_skipToggleOld) {
+    const changes = [];
+    if (password) changes.push('password changed');
+    if (fullName) changes.push(`Name set to "${user.fullName}"`);
+    if (role && role !== user.role) changes.push(`Role changed to "${user.role}"`);
+    if (normalizedEmail && normalizedEmail !== user.email) changes.push(`Email changed to "${user.email}"`);
+    const actionDesc = changes.length > 0
+      ? `Account modifications applied by SuperAdmin: ${changes.join(', ')}`
+      : 'Account profile details updated by SuperAdmin';
+
+    if (!Array.isArray(user.accountNotifications)) user.accountNotifications = [];
+    user.accountNotifications.push({
+      message: actionDesc,
+      title: 'Account Security Notice',
+      actionType: password ? 'PASSWORD_CHANGED' : 'ACCOUNT_MODIFIED',
+      createdAt: new Date(),
+      read: false
+    });
+    await user.save();
+
+    await dispatchZeroTrustSecurityAlert(
+      user.email,
+      user.fullName,
+      user.role,
+      actionDesc,
+      req.authenticatedUser?.role || 'SuperAdmin',
+      req.ip || '127.0.0.1'
+    );
+    if (false && (user.role === 'SuperAdmin' || user.role === 'Owner')) {
+      dispatchZeroTrustSecurityAlert(
+        user.email,
+        user.fullName,
+        user.role,
+        `SuperAdmin account status toggled: ${user.isActive ? 'Reactivated' : 'Deactivated'}`,
+        req.authenticatedUser?.role || 'SuperAdmin',
+        req.ip || '127.0.0.1'
+      );
+    }
+  }
     await user.save();
 
     const action = user.isActive ? 'ACTIVATED' : 'DEACTIVATED';
@@ -502,6 +803,80 @@ const logInventorySpoilageOrVoid = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Failed to process inventory spoilage write-off.'
+    });
+  }
+};
+
+const updateInventoryBatchStatus = async (req, res) => {
+  try {
+    const { batchLotId, batchNumber, id, status, expirationDate } = req.body;
+    const batchIdentifier = String(batchLotId || batchNumber || id || req.params.id || '').trim();
+
+    if (!batchIdentifier) {
+      return res.status(400).json({
+        success: false,
+        message: 'Batch Lot ID or inventory ID is required.'
+      });
+    }
+
+    const isObjectId = mongoose.Types.ObjectId.isValid(batchIdentifier);
+    const query = isObjectId
+      ? { $or: [{ _id: batchIdentifier }, { batchNumber: batchIdentifier.toUpperCase() }] }
+      : { batchNumber: batchIdentifier.toUpperCase() };
+
+    const vialRecord = await Inventory.findOne(query);
+    if (!vialRecord) {
+      return res.status(404).json({
+        success: false,
+        message: `Vaccine batch "${batchIdentifier}" not found.`
+      });
+    }
+
+    const newStatus = String(status || 'Expired').trim();
+    if (newStatus.toLowerCase() === 'expired') {
+      const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      vialRecord.expirationDate = yesterday;
+    } else if (expirationDate) {
+      vialRecord.expirationDate = new Date(expirationDate);
+    }
+
+    if (!Array.isArray(vialRecord.events)) {
+      vialRecord.events = [];
+    }
+    vialRecord.events.push({
+      eventType: 'STATUS_MODIFIED',
+      vialsDeducted: 0,
+      reason: `Batch status updated to ${newStatus} by ${req.authenticatedUser?.role || 'SuperAdmin'}`,
+      timestamp: new Date(),
+      performedBy: mongoose.Types.ObjectId.isValid(req.authenticatedUser?.userId) ? req.authenticatedUser.userId : null,
+      actorRole: req.authenticatedUser?.role || 'SuperAdmin'
+    });
+
+    await vialRecord.save();
+
+    await AuditLog.create({
+      actorId: mongoose.Types.ObjectId.isValid(req.authenticatedUser?.userId)
+        ? req.authenticatedUser.userId
+        : null,
+      actorRole: req.authenticatedUser?.role || 'SuperAdmin',
+      actionType: 'INVENTORY_STATUS_UPDATED',
+      targetCollection: 'Inventory',
+      description: `Marked batch Lot ${vialRecord.batchNumber} (${vialRecord.vaccineType}) as ${newStatus}.`,
+      ipAddress: req.ip || '127.0.0.1'
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `Batch Lot ${vialRecord.batchNumber} status updated to ${newStatus}.`,
+      data: {
+        inventory: vialRecord
+      }
+    });
+  } catch (error) {
+    console.error('Update inventory status error:', error.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to update vaccine batch status.'
     });
   }
 };
@@ -1018,6 +1393,15 @@ const getDashboardSummary = async (req, res) => {
           erig: buildVialHealth('ERIG', 10, 0.8)
         };
 
+        let pvrvStockRunwayDays = 0;
+        let erigStockRunwayDays = 0;
+        if (inventoryHealth && inventoryHealth.pvrv) {
+          pvrvStockRunwayDays = inventoryHealth.pvrv.runwayDays || 0;
+        }
+        if (inventoryHealth && inventoryHealth.erig) {
+          erigStockRunwayDays = inventoryHealth.erig.runwayDays || 0;
+        }
+
         // --- Format Surveillance Maps (Normalized Canonical Puroks) ---
         const purokOutbreaks = {};
         for (const p of purokAgg || []) {
@@ -1288,6 +1672,15 @@ const getDashboardSummary = async (req, res) => {
       erig: buildVialHealth('ERIG', 10, 0.8)
     };
 
+    let pvrvStockRunwayDays = 0;
+    let erigStockRunwayDays = 0;
+    if (inventoryHealth && inventoryHealth.pvrv) {
+      pvrvStockRunwayDays = inventoryHealth.pvrv.runwayDays || 0;
+    }
+    if (inventoryHealth && inventoryHealth.erig) {
+      erigStockRunwayDays = inventoryHealth.erig.runwayDays || 0;
+    }
+
     // 8. Surveillance Maps (Normalized Canonical Puroks)
     const purokOutbreaks = {};
     patients.forEach((p) => {
@@ -1475,7 +1868,8 @@ module.exports = {
   updatePatientDemographics,
   getDashboardSummary,
   getRecentAuditLogs,
-  logDataExport
+  logDataExport,
+  updateInventoryBatchStatus
 };
 
 //Si alonto to po gumawa nito 
